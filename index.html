@@ -929,8 +929,34 @@ end $$;`
           this.authMode='in'; this.auth.busy=false; return;
         }
         this.session=data.session; await this.boot();
-      }catch(e){ this.auth.err = e.message || 'Échec de connexion.'; }
+      }catch(e){
+        console.error('Auth error:', e);
+        this.auth.err = this.authErrorFr(e);
+      }
       this.auth.busy=false;
+    },
+    authErrorFr(e){
+      const raw=(e && (e.message||e.error_description||e.msg)||'').toLowerCase();
+      const code=(e && e.code)||'';
+      if(raw.includes('email not confirmed'))
+        return "E-mail non confirmé. Ouvrez le lien reçu par mail, ou désactivez « Confirm email » dans Supabase (Authentication → Providers → Email).";
+      if(raw.includes('invalid login credentials'))
+        return "Identifiants incorrects (e-mail ou mot de passe). Si vous n'avez pas encore de compte, cliquez sur « En créer un ».";
+      if(raw.includes('user already registered')||code==='user_already_exists')
+        return "Un compte existe déjà avec cet e-mail. Utilisez « Se connecter ».";
+      if(raw.includes('signups not allowed')||raw.includes('email signups are disabled')||raw.includes('signup is disabled'))
+        return "Les inscriptions par e-mail sont désactivées dans votre projet. Activez le provider Email dans Supabase (Authentication → Providers → Email).";
+      if(raw.includes('password should be at least')||raw.includes('password is too short'))
+        return "Mot de passe trop court (6 caractères minimum par défaut).";
+      if(raw.includes('unable to validate email')||raw.includes('invalid email'))
+        return "Adresse e-mail invalide.";
+      if(raw.includes('rate limit')||raw.includes('too many'))
+        return "Trop de tentatives (limite d'e-mails Supabase). Réessayez dans une heure, ou désactivez la confirmation par e-mail.";
+      if(raw.includes('failed to fetch')||raw.includes('networkerror')||raw.includes('load failed'))
+        return "Requête bloquée (réseau, CORS ou clé/URL incorrecte). Vérifiez l'URL et la clé, et un éventuel bloqueur de scripts.";
+      if(raw.includes('invalid api key')||raw.includes('no api key')||code==='invalid_api_key')
+        return "Clé API invalide. Recopiez la clé « Publishable » (ou l'anon legacy) depuis Settings → API.";
+      return (e && e.message) ? e.message : 'Échec de la connexion.';
     },
     async signOut(){ await this.db.auth.signOut(); this.resetData(); this.stage='auth'; },
     resetData(){ this.profile=null; this.weights=[]; this.workouts=[]; this.intakes=[]; this.goals=[]; },
