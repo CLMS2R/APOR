@@ -278,7 +278,6 @@
         <div><b>Cadence</b><span>{{ todayLabel }}</span></div>
       </div>
       <div class="who">
-        {{ session?.user?.email }}<br />
         <button @click="signOut">Se déconnecter</button>
       </div>
     </div>
@@ -469,11 +468,29 @@
           <div class="field"><label>Notes (optionnel)</label>
             <input type="text" v-model.trim="woForm.notes" placeholder="ex. push day, drop sets…" /></div>
 
+          <div class="field">
+            <label style="display:flex;align-items:center;gap:9px;cursor:pointer;font-weight:600">
+              <input type="checkbox" v-model="woForm.repeat" style="width:auto;margin:0" />
+              Répéter chaque semaine
+            </label>
+            <div v-if="woForm.repeat" class="row" style="align-items:center;margin-top:9px">
+              <span style="flex:0 0 auto;color:var(--slate);font-size:13.5px">pendant</span>
+              <input type="number" min="1" max="52" v-model.number="woForm.repeatWeeks" style="max-width:90px" />
+              <span style="flex:1;color:var(--slate);font-size:13.5px">semaine(s), même jour et même heure</span>
+            </div>
+          </div>
+
+          <div v-if="woForm.repeat" class="note" style="margin:-4px 0 14px">
+            Créera <b>{{ repeatCount }} séance(s)</b> hebdomadaire(s), du {{ frDate(woForm.date) }} au {{ frDate(lastRepeatDate) }}.
+            Chaque séance reste supprimable séparément.
+          </div>
+
           <div class="callout info" style="margin:0 0 14px">
-            <span>🔥</span><span>Cette séance ajoutera <b>~{{ Math.round(burnOf(woForm)) }} kcal</b> et
+            <span>🔥</span><span>Chaque séance ajoutera <b>~{{ Math.round(burnOf(woForm)) }} kcal</b> et
               <b>~{{ Math.round(waterAddOf(woForm)) }} ml</b> d'eau à l'objectif du jour concerné.</span>
           </div>
-          <button class="btn strength full" :disabled="!validWorkout" @click="addWorkout">Ajouter la séance</button>
+          <button class="btn strength full" :disabled="!validWorkout" @click="addWorkout">
+            {{ woForm.repeat? 'Ajouter les séances' : 'Ajouter la séance' }}</button>
         </div>
 
         <div class="card">
@@ -655,7 +672,7 @@ const __app = createApp({
       pForm:{ height_cm:null, age:null, sex:'homme', base_activity:'leger' },
       wForm:{ weight:null, date:todayISO() },
       woForm:{ date:todayISO(), start_time:'', type:'Musculation', duration_min:60,
-               intensity:'Modérée', muscles:[], notes:'' },
+               intensity:'Modérée', muscles:[], notes:'', repeat:false, repeatWeeks:8 },
       gForm:{ target:null, date:'' },
       quick:{ water:null, food:'', kcal:null },
 
@@ -802,8 +819,11 @@ end $$;`
     validWorkout(){
       if(!this.woForm.duration_min) return false;
       if(this.woForm.type==='Musculation' && !this.woForm.muscles.length) return false;
+      if(this.woForm.repeat && (!this.woForm.repeatWeeks || this.woForm.repeatWeeks<1)) return false;
       return true;
     },
+    repeatCount(){ return Math.min(52, Math.max(1, this.woForm.repeatWeeks||1)); },
+    lastRepeatDate(){ return this.addDays(this.woForm.date, 7*(this.repeatCount-1)); },
 
     reco(){
       const g=this.activeGoal; if(!g||!this.currentWeight) return {};
@@ -982,18 +1002,23 @@ end $$;`
       const a=this.woForm.muscles;
       a.includes(m)? a.splice(a.indexOf(m),1) : a.push(m);
     },
+    addDays(iso,n){ const d=new Date(iso+'T00:00:00'); d.setDate(d.getDate()+n); return d.toLocaleDateString('sv-SE'); },
     async addWorkout(){
       if(!this.validWorkout) return;
       const f=this.woForm;
-      const payload={ user_id:this.session.user.id, date:f.date, start_time:f.start_time||null,
+      const mk=(date)=>({ user_id:this.session.user.id, date, start_time:f.start_time||null,
         type:f.type, duration_min:f.duration_min, intensity:f.intensity,
-        muscles: f.type==='Musculation'? f.muscles : [], notes:f.notes||null };
-      const { data,error } = await this.db.from('workouts').insert(payload).select().single();
+        muscles: f.type==='Musculation'? [...f.muscles] : [], notes:f.notes||null });
+      let payloads=[mk(f.date)];
+      if(f.repeat){
+        payloads=[]; for(let i=0;i<this.repeatCount;i++) payloads.push(mk(this.addDays(f.date, 7*i)));
+      }
+      const { data,error } = await this.db.from('workouts').insert(payloads).select();
       if(error) return this.flash('Erreur : '+error.message);
-      this.workouts.push(data);
-      this.flash('Séance ajoutée');
+      this.workouts.push(...data);
+      this.flash(f.repeat? data.length+' séances ajoutées' : 'Séance ajoutée');
       this.woForm={ date:todayISO(), start_time:'', type:'Musculation', duration_min:60,
-        intensity:'Modérée', muscles:[], notes:'' };
+        intensity:'Modérée', muscles:[], notes:'', repeat:false, repeatWeeks:8 };
     },
     async delWorkout(id){ await this.db.from('workouts').delete().eq('id',id); this.workouts=this.workouts.filter(w=>w.id!==id); },
 
