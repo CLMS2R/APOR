@@ -601,6 +601,16 @@
 const { createApp } = Vue;
 const todayISO = () => new Date().toLocaleDateString('sv-SE'); // YYYY-MM-DD local
 
+/* ===================================================================
+   VOS IDENTIFIANTS SUPABASE — collez-les ici une fois pour toutes.
+   (Project Settings → API → Project URL et clé "anon / public".)
+   La clé anon est faite pour être publique : ce sont les règles RLS
+   activées par le script SQL qui protègent vos données.
+   Laissez vide ("") pour utiliser l'écran de configuration à la place.
+=================================================================== */
+const SUPABASE_URL = "";   // ex. "https://xxxx.supabase.co"
+const SUPABASE_KEY = "";   // ex. "eyJhbGciOi..."
+
 createApp({
   data(){
     return {
@@ -821,6 +831,12 @@ end $$;`
   },
 
   async mounted(){
+    // 1) Identifiants codés en dur (priorité)
+    if(SUPABASE_URL && SUPABASE_KEY){
+      this.cfg={ url:SUPABASE_URL, key:SUPABASE_KEY };
+      await this.initClient(); return;
+    }
+    // 2) Sinon, identifiants déjà saisis via l'écran de configuration
     const saved=JSON.parse(localStorage.getItem('cadence_cfg')||'null');
     if(saved && saved.url && saved.key){ this.cfg=saved; await this.initClient(); }
     else this.stage='config';
