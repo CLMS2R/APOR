@@ -594,8 +594,31 @@
   <transition name="fade"><div v-if="toast" class="toast">{{ toast }}</div></transition>
 </div>
 
-<script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="https://unpkg.com/vue@3/dist/vue.global.prod.js" onerror="window.__cdnFail=(window.__cdnFail||[]).concat('Vue')"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js" onerror="window.__cdnFail=(window.__cdnFail||[]).concat('Supabase')"></script>
+<script>
+  // Filet de sécurité : si une librairie ne s'est pas chargée, afficher pourquoi
+  (function(){
+    function boom(msg){
+      var el=document.getElementById('app');
+      if(el) el.innerHTML='<div style="max-width:520px;margin:12vh auto;padding:24px;'
+        +'font-family:system-ui,sans-serif;background:#fff;border:1px solid #DBDDE1;'
+        +'border-radius:16px;box-shadow:0 8px 28px rgba(0,0,0,.08)">'
+        +'<h2 style="margin:0 0 10px;font-size:19px">Le démarrage a échoué</h2>'
+        +'<p style="color:#6B7280;font-size:14px;line-height:1.6;margin:0">'+msg+'</p></div>';
+    }
+    if(window.__cdnFail || typeof Vue==='undefined' || typeof supabase==='undefined'){
+      var missing=(window.__cdnFail||[]);
+      if(typeof Vue==='undefined' && missing.indexOf('Vue')<0) missing.push('Vue');
+      if(typeof supabase==='undefined' && missing.indexOf('Supabase')<0) missing.push('Supabase');
+      boom('Impossible de charger : <b>'+missing.join(' et ')+'</b>. '
+        +'Vérifiez votre connexion Internet, désactivez un éventuel bloqueur de publicités/scripts '
+        +'sur cette page, puis rechargez (Ctrl+Maj+R). '
+        +'Ces librairies sont chargées depuis unpkg.com et jsdelivr.net.');
+      window.__bootBlocked=true;
+    }
+  })();
+</script>
 <script>
 const { createApp } = Vue;
 const todayISO = () => new Date().toLocaleDateString('sv-SE'); // YYYY-MM-DD local
@@ -610,7 +633,8 @@ const todayISO = () => new Date().toLocaleDateString('sv-SE'); // YYYY-MM-DD loc
 const SUPABASE_URL = "https://hxaormttsnjftyunjkqi.supabase.co";   // ex. "https://xxxx.supabase.co"
 const SUPABASE_KEY = "sb_publishable_wiy-sK275uTVOtMjWxYh9g_LF9tSWnx";   // ex. "eyJhbGciOi..."
 
-createApp({
+if(!window.__bootBlocked){
+const __app = createApp({
   data(){
     return {
       stage:'loading',            // config | auth | loading | app
@@ -1006,7 +1030,18 @@ end $$;`
       return factor*h;
     },
   }
-}).mount('#app');
+});
+try {
+  __app.mount('#app');
+} catch(err){
+  document.getElementById('app').innerHTML =
+    '<div style="max-width:520px;margin:12vh auto;padding:24px;font-family:system-ui,sans-serif;'
+    +'background:#fff;border:1px solid #DBDDE1;border-radius:16px">'
+    +'<h2 style="margin:0 0 10px;font-size:19px">Erreur au démarrage</h2>'
+    +'<p style="color:#6B7280;font-size:14px;line-height:1.6;margin:0">'+(err && err.message || err)+'</p></div>';
+  console.error(err);
+}
+} // fin if(!window.__bootBlocked)
 </script>
 </body>
 </html>
