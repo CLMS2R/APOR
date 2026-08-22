@@ -1,0 +1,990 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Cadence — suivi nutrition & entraînement</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+
+<style>
+  :root{
+    --canvas:#ECEDEF;
+    --surface:#FFFFFF;
+    --ink:#181A1F;
+    --slate:#6B7280;
+    --faint:#9AA0A8;
+    --hairline:#DBDDE1;
+    --energy:#E8622A;       /* calories */
+    --energy-bg:#FBE7DC;
+    --water:#1596B4;        /* hydratation */
+    --water-bg:#DBEFF4;
+    --strength:#5B3DF5;     /* objectifs */
+    --strength-bg:#E6E1FD;
+    --good:#1F9E63;
+    --warn:#C7891A;
+    --danger:#D14343;
+    --radius:16px;
+    --shadow:0 1px 2px rgba(24,26,31,.04), 0 8px 28px rgba(24,26,31,.06);
+    --display:'Space Grotesk',system-ui,sans-serif;
+    --body:'Inter',system-ui,sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{
+    background:var(--canvas);
+    color:var(--ink);
+    font-family:var(--body);
+    -webkit-font-smoothing:antialiased;
+    line-height:1.5;
+  }
+  h1,h2,h3,h4{font-family:var(--display);margin:0;font-weight:600;letter-spacing:-.01em}
+  .num{font-family:var(--display);font-variant-numeric:tabular-nums;font-feature-settings:"tnum"}
+  button{font-family:var(--body);cursor:pointer}
+  input,select{font-family:var(--body)}
+  a{color:var(--strength)}
+
+  /* ---------- layout ---------- */
+  .app{max-width:1080px;margin:0 auto;padding:0 18px 120px}
+  .topbar{
+    position:sticky;top:0;z-index:20;
+    display:flex;align-items:center;justify-content:space-between;gap:12px;
+    padding:16px 18px;margin:0 -18px 8px;
+    background:rgba(236,237,239,.82);backdrop-filter:blur(10px);
+    border-bottom:1px solid var(--hairline);
+  }
+  .brand{display:flex;align-items:center;gap:11px}
+  .mark{
+    width:34px;height:34px;border-radius:9px;flex:none;position:relative;
+    background:var(--ink);overflow:hidden;
+  }
+  .mark::before{content:"";position:absolute;left:6px;right:6px;bottom:5px;height:42%;
+    background:var(--water);border-radius:2px}
+  .mark::after{content:"";position:absolute;left:6px;top:6px;width:8px;height:8px;border-radius:50%;
+    background:var(--energy)}
+  .brand b{font-family:var(--display);font-size:19px;letter-spacing:-.02em}
+  .brand span{display:block;font-size:11px;color:var(--slate);letter-spacing:.14em;text-transform:uppercase;margin-top:-2px}
+  .who{font-size:12.5px;color:var(--slate);text-align:right;line-height:1.3}
+  .who button{margin-top:2px;background:none;border:none;color:var(--strength);font-size:12px;padding:0;text-decoration:underline}
+
+  .tabs{display:flex;gap:4px;overflow-x:auto;padding:4px;margin:0 -18px 20px;
+    padding-left:18px;padding-right:18px;scrollbar-width:none}
+  .tabs::-webkit-scrollbar{display:none}
+  .tab{
+    border:1px solid transparent;background:none;color:var(--slate);
+    padding:8px 15px;border-radius:999px;font-size:14px;font-weight:500;white-space:nowrap;
+    display:flex;align-items:center;gap:7px;transition:.15s;
+  }
+  .tab:hover{color:var(--ink)}
+  .tab.on{background:var(--ink);color:#fff}
+  .tab .dot{width:7px;height:7px;border-radius:50%;background:currentColor;opacity:.55}
+
+  .grid{display:grid;gap:16px}
+  @media(min-width:760px){
+    .g-2{grid-template-columns:1fr 1fr}
+    .g-3{grid-template-columns:1.15fr .85fr}
+    .dash{grid-template-columns:1.3fr 1fr}
+  }
+  .card{
+    background:var(--surface);border:1px solid var(--hairline);border-radius:var(--radius);
+    padding:20px;box-shadow:var(--shadow);
+  }
+  .card h3{font-size:13px;letter-spacing:.1em;text-transform:uppercase;color:var(--slate);
+    font-weight:600;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between}
+  .eyebrow{font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--faint);font-weight:600}
+
+  /* ---------- signature: gauges ---------- */
+  .gauges{display:flex;gap:22px;align-items:stretch}
+  .cyl-wrap{display:flex;flex-direction:column;align-items:center;gap:10px;flex:1;min-width:0}
+  .cyl{
+    position:relative;width:100%;max-width:120px;height:210px;border-radius:14px 14px 12px 12px;
+    background:var(--water-bg);border:2px solid #fff;
+    box-shadow:inset 0 0 0 1px var(--hairline);overflow:hidden;
+  }
+  .cyl .fill{position:absolute;left:0;right:0;bottom:0;background:var(--water);
+    transition:height .7s cubic-bezier(.4,0,.2,1)}
+  .cyl .fill.energy{background:var(--energy)}
+  .cyl.energy{background:var(--energy-bg)}
+  .cyl .ticks{position:absolute;inset:0;pointer-events:none}
+  .cyl .ticks i{position:absolute;left:0;width:8px;height:1px;background:rgba(24,26,31,.14)}
+  .cyl .read{position:absolute;left:0;right:0;top:12px;text-align:center;z-index:2}
+  .cyl .read b{font-family:var(--display);font-size:26px;line-height:1;display:block}
+  .cyl .read small{font-size:11px;color:var(--slate)}
+  .cyl-label{font-size:13px;font-weight:600;text-align:center}
+  .cyl-label span{display:block;font-size:12px;color:var(--slate);font-weight:400}
+
+  .statline{display:flex;gap:10px;flex-wrap:wrap;margin-top:6px}
+  .stat{flex:1;min-width:120px;background:var(--canvas);border-radius:12px;padding:12px 14px}
+  .stat .k{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--slate)}
+  .stat .v{font-family:var(--display);font-size:22px;margin-top:3px}
+  .stat .v small{font-size:12px;color:var(--slate);font-family:var(--body)}
+
+  /* quick add */
+  .chips{display:flex;flex-wrap:wrap;gap:8px}
+  .chip{border:1px solid var(--hairline);background:#fff;border-radius:999px;padding:8px 13px;
+    font-size:13px;font-weight:500;display:inline-flex;gap:6px;align-items:center;transition:.15s}
+  .chip:hover{border-color:var(--ink)}
+  .chip.water{color:var(--water)}
+  .chip.energy{color:var(--energy)}
+
+  .field{display:flex;flex-direction:column;gap:5px;margin-bottom:14px}
+  .field label{font-size:12.5px;font-weight:600;color:var(--slate)}
+  input[type=text],input[type=number],input[type=date],input[type=time],input[type=email],
+  input[type=password],select,textarea{
+    width:100%;padding:10px 12px;border:1px solid var(--hairline);border-radius:10px;
+    font-size:14.5px;background:#fff;color:var(--ink);transition:.15s
+  }
+  input:focus,select:focus,textarea:focus{outline:none;border-color:var(--strength);
+    box-shadow:0 0 0 3px var(--strength-bg)}
+  .row{display:flex;gap:12px}
+  .row>*{flex:1}
+
+  .btn{border:none;border-radius:10px;padding:11px 16px;font-size:14.5px;font-weight:600;
+    background:var(--ink);color:#fff;transition:.15s;display:inline-flex;align-items:center;
+    gap:8px;justify-content:center}
+  .btn:hover{opacity:.9}
+  .btn:disabled{opacity:.5;cursor:not-allowed}
+  .btn.ghost{background:#fff;color:var(--ink);border:1px solid var(--hairline)}
+  .btn.energy{background:var(--energy)}
+  .btn.water{background:var(--water)}
+  .btn.strength{background:var(--strength)}
+  .btn.full{width:100%}
+  .btn.sm{padding:7px 12px;font-size:13px}
+
+  .list{display:flex;flex-direction:column;gap:2px}
+  .item{display:flex;align-items:center;gap:12px;padding:11px 4px;border-bottom:1px solid var(--hairline)}
+  .item:last-child{border-bottom:none}
+  .item .ico{width:34px;height:34px;border-radius:9px;flex:none;display:grid;place-items:center;
+    font-size:15px;background:var(--canvas)}
+  .item .ico.w{background:var(--water-bg);color:var(--water)}
+  .item .ico.c{background:var(--energy-bg);color:var(--energy)}
+  .item .main{flex:1;min-width:0}
+  .item .main b{font-size:14.5px;font-weight:600;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .item .main small{font-size:12.5px;color:var(--slate)}
+  .item .amt{font-family:var(--display);font-size:15px;text-align:right}
+  .item .x{border:none;background:none;color:var(--faint);font-size:18px;padding:2px 6px;line-height:1}
+  .item .x:hover{color:var(--danger)}
+  .empty{text-align:center;color:var(--faint);font-size:14px;padding:26px 10px}
+
+  .badge{display:inline-block;font-size:11.5px;font-weight:600;padding:3px 9px;border-radius:999px;
+    background:var(--canvas);color:var(--slate)}
+  .badge.m{background:var(--strength-bg);color:var(--strength)}
+
+  .muscles{display:flex;flex-wrap:wrap;gap:7px;margin-top:4px}
+  .mtag{border:1px solid var(--hairline);border-radius:8px;padding:6px 11px;font-size:13px;
+    cursor:pointer;user-select:none;transition:.12s;background:#fff}
+  .mtag.on{background:var(--strength);color:#fff;border-color:var(--strength)}
+
+  .note{font-size:12.5px;color:var(--slate);line-height:1.5}
+  .callout{border-radius:12px;padding:13px 15px;font-size:13.5px;line-height:1.55;display:flex;gap:10px}
+  .callout.warn{background:#FBF3E1;color:#7a5a10}
+  .callout.info{background:var(--strength-bg);color:#3a2ba8}
+  .callout.good{background:#E4F5EC;color:#146b43}
+
+  .kv{display:flex;justify-content:space-between;padding:9px 0;border-bottom:1px solid var(--hairline);font-size:14px}
+  .kv:last-child{border-bottom:none}
+  .kv b{font-family:var(--display)}
+
+  svg.chart{width:100%;height:auto;display:block}
+
+  /* ---------- auth / config screens ---------- */
+  .gate{min-height:100vh;display:grid;place-items:center;padding:24px}
+  .gate .card{max-width:440px;width:100%}
+  .gate .mark{width:44px;height:44px}
+  .center-brand{display:flex;flex-direction:column;align-items:center;gap:12px;margin-bottom:24px;text-align:center}
+  .toggle-auth{background:none;border:none;color:var(--strength);font-size:13.5px;text-decoration:underline;padding:0}
+  .err{color:var(--danger);font-size:13px;margin-top:4px}
+  .ok{color:var(--good);font-size:13px;margin-top:4px}
+  details.setup{margin-top:14px;border:1px solid var(--hairline);border-radius:10px;padding:0 14px;background:var(--canvas)}
+  details.setup summary{cursor:pointer;padding:12px 0;font-weight:600;font-size:13.5px}
+  details.setup pre{white-space:pre-wrap;font-size:11.5px;background:#fff;border:1px solid var(--hairline);
+    border-radius:8px;padding:12px;overflow:auto;font-family:ui-monospace,monospace;line-height:1.45}
+
+  .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--ink);color:#fff;
+    padding:11px 18px;border-radius:999px;font-size:14px;z-index:50;box-shadow:var(--shadow)}
+  .fade-enter-active,.fade-leave-active{transition:opacity .25s}
+  .fade-enter-from,.fade-leave-to{opacity:0}
+
+  .spinner{width:34px;height:34px;border:3px solid var(--hairline);border-top-color:var(--strength);
+    border-radius:50%;animation:spin .8s linear infinite;margin:40px auto}
+  @keyframes spin{to{transform:rotate(360deg)}}
+
+  @media (prefers-reduced-motion: reduce){
+    *{transition:none!important;animation:none!important}
+  }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- ============ CONFIG (clés Supabase) ============ -->
+  <div v-if="stage==='config'" class="gate">
+    <div class="card">
+      <div class="center-brand">
+        <div class="mark"></div>
+        <div><h1 style="font-size:26px">Cadence</h1>
+        <div class="eyebrow" style="margin-top:4px">Connexion à votre Supabase</div></div>
+      </div>
+      <p class="note" style="margin-bottom:16px">Collez l'URL et la clé <b>anon/public</b> de votre projet Supabase
+        (Project&nbsp;Settings → API). Elles restent stockées uniquement dans votre navigateur.</p>
+      <div class="field"><label>URL du projet</label>
+        <input type="text" v-model.trim="cfg.url" placeholder="https://xxxx.supabase.co" /></div>
+      <div class="field"><label>Clé anon / public</label>
+        <input type="text" v-model.trim="cfg.key" placeholder="eyJhbGciOi..." /></div>
+      <button class="btn full" :disabled="!cfg.url||!cfg.key" @click="saveConfig">Continuer</button>
+      <details class="setup">
+        <summary>Étapes à faire une seule fois dans Supabase (SQL)</summary>
+        <p class="note" style="margin:10px 0">Créez un projet gratuit sur supabase.com, puis exécutez ce SQL
+          dans <b>SQL Editor</b> pour créer les tables et la sécurité par utilisateur :</p>
+        <pre>{{ sqlSetup }}</pre>
+      </details>
+    </div>
+  </div>
+
+  <!-- ============ AUTH ============ -->
+  <div v-else-if="stage==='auth'" class="gate">
+    <div class="card">
+      <div class="center-brand">
+        <div class="mark"></div>
+        <div><h1 style="font-size:26px">Cadence</h1>
+        <div class="eyebrow" style="margin-top:4px">{{ authMode==='in'?'Se connecter':'Créer un compte' }}</div></div>
+      </div>
+      <div class="field"><label>E-mail</label>
+        <input type="email" v-model.trim="auth.email" @keyup.enter="doAuth" placeholder="vous@exemple.com" /></div>
+      <div class="field"><label>Mot de passe</label>
+        <input type="password" v-model="auth.password" @keyup.enter="doAuth" placeholder="••••••••" /></div>
+      <div v-if="auth.err" class="err">{{ auth.err }}</div>
+      <div v-if="auth.msg" class="ok">{{ auth.msg }}</div>
+      <button class="btn full" style="margin-top:6px" :disabled="auth.busy" @click="doAuth">
+        {{ auth.busy?'…':(authMode==='in'?'Se connecter':'Créer le compte') }}</button>
+      <p style="text-align:center;margin:14px 0 0">
+        <button class="toggle-auth" @click="authMode=authMode==='in'?'up':'in'; auth.err='';auth.msg=''">
+          {{ authMode==='in'?"Pas de compte ? En créer un":"Déjà un compte ? Se connecter" }}</button></p>
+      <p style="text-align:center;margin-top:10px">
+        <button class="toggle-auth" @click="stage='config'">Changer de projet Supabase</button></p>
+    </div>
+  </div>
+
+  <!-- ============ LOADING ============ -->
+  <div v-else-if="stage==='loading'" class="gate"><div class="spinner"></div></div>
+
+  <!-- ============ APP ============ -->
+  <div v-else class="app">
+    <div class="topbar">
+      <div class="brand">
+        <div class="mark"></div>
+        <div><b>Cadence</b><span>{{ todayLabel }}</span></div>
+      </div>
+      <div class="who">
+        {{ session?.user?.email }}<br />
+        <button @click="signOut">Se déconnecter</button>
+      </div>
+    </div>
+
+    <div class="tabs">
+      <button v-for="t in tabsList" :key="t.id" class="tab" :class="{on:tab===t.id}" @click="tab=t.id">
+        <span class="dot"></span>{{ t.label }}</button>
+    </div>
+
+    <!-- ===== profil manquant ===== -->
+    <div v-if="!profileReady && tab!=='profil'" class="callout info" style="margin-bottom:16px">
+      <span>👤</span><span>Renseignez d'abord votre profil (taille, âge, sexe) pour calculer vos objectifs.
+        <a href="#" @click.prevent="tab='profil'">Compléter le profil →</a></span>
+    </div>
+
+    <!-- ============ DASHBOARD ============ -->
+    <div v-show="tab==='jour'">
+      <div class="grid dash">
+        <!-- gauges -->
+        <div class="card">
+          <h3>Aujourd'hui <span class="badge">{{ currentWeight?currentWeight+' kg':'poids ?' }}</span></h3>
+          <div class="gauges">
+            <div class="cyl-wrap">
+              <div class="cyl energy">
+                <div class="ticks"><i v-for="n in 4" :key="n" :style="{bottom:(n*20)+'%'}"></i></div>
+                <div class="read"><b class="num">{{ Math.round(todayCalories) }}</b><small>/ {{ calorieTarget }} kcal</small></div>
+                <div class="fill energy" :style="{height:pct(todayCalories,calorieTarget)+'%'}"></div>
+              </div>
+              <div class="cyl-label">Calories<span>{{ Math.max(0,calorieTarget-Math.round(todayCalories)) }} kcal restantes</span></div>
+            </div>
+            <div class="cyl-wrap">
+              <div class="cyl">
+                <div class="ticks"><i v-for="n in 4" :key="n" :style="{bottom:(n*20)+'%'}"></i></div>
+                <div class="read"><b class="num">{{ (todayWater/1000).toFixed(2) }}</b><small>/ {{ (waterTarget/1000).toFixed(2) }} L</small></div>
+                <div class="fill" :style="{height:pct(todayWater,waterTarget)+'%'}"></div>
+              </div>
+              <div class="cyl-label">Eau<span>{{ Math.max(0,Math.round((waterTarget-todayWater)/50)*50) }} ml restants</span></div>
+            </div>
+          </div>
+
+          <div class="statline">
+            <div class="stat"><div class="k">Protéines cible</div><div class="v num">{{ proteinTarget }}<small> g</small></div></div>
+            <div class="stat"><div class="k">Dépense entraînement</div><div class="v num">{{ Math.round(todayBurn) }}<small> kcal</small></div></div>
+            <div class="stat"><div class="k">Maintenance</div><div class="v num">{{ Math.round(maintenance) }}<small> kcal</small></div></div>
+          </div>
+
+          <div v-if="calorieFloored" class="callout warn" style="margin-top:14px">
+            <span>⚠️</span><span>Votre objectif a été relevé à un plancher raisonnable ({{ calorieTarget }} kcal).
+            Descendre plus bas nuirait à votre masse musculaire et à votre santé.</span>
+          </div>
+        </div>
+
+        <!-- quick add -->
+        <div class="grid" style="gap:16px">
+          <div class="card">
+            <h3>Ajouter de l'eau</h3>
+            <div class="chips">
+              <button v-for="v in [200,330,500,750]" :key="v" class="chip water" @click="quickWater(v)">+ {{ v }} ml</button>
+            </div>
+            <div class="row" style="margin-top:14px">
+              <input type="number" v-model.number="quick.water" placeholder="ml" />
+              <button class="btn water" style="flex:none;padding-left:20px;padding-right:20px"
+                @click="quickWater(quick.water); quick.water=null">Ajouter</button>
+            </div>
+          </div>
+          <div class="card">
+            <h3>Ajouter des calories</h3>
+            <div class="row">
+              <input type="text" v-model.trim="quick.food" placeholder="Aliment / repas" />
+            </div>
+            <div class="row" style="margin-top:10px">
+              <input type="number" v-model.number="quick.kcal" placeholder="kcal" />
+              <button class="btn energy" style="flex:none;padding-left:20px;padding-right:20px"
+                :disabled="!quick.kcal" @click="addCalories">Ajouter</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- journal du jour -->
+      <div class="grid g-2" style="margin-top:16px">
+        <div class="card">
+          <h3>Journal du jour <span class="badge">{{ todayIntakes.length }}</span></h3>
+          <div class="list">
+            <div v-if="!todayIntakes.length" class="empty">Rien enregistré pour le moment.</div>
+            <div v-for="i in todayIntakes" :key="i.id" class="item">
+              <div class="ico" :class="i.kind==='water'?'w':'c'">{{ i.kind==='water'?'💧':'🍽️' }}</div>
+              <div class="main"><b>{{ i.label || (i.kind==='water'?'Eau':'Repas') }}</b>
+                <small>{{ timeOf(i.ts) }}</small></div>
+              <div class="amt">{{ i.kind==='water'? i.amount+' ml' : Math.round(i.amount)+' kcal' }}</div>
+              <button class="x" @click="delIntake(i.id)">×</button>
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <h3>Entraînements du jour <span class="badge">{{ todayWorkouts.length }}</span></h3>
+          <div class="list">
+            <div v-if="!todayWorkouts.length" class="empty">Aucune séance planifiée aujourd'hui.
+              <br /><a href="#" @click.prevent="tab='entrainements'">Programmer une séance →</a></div>
+            <div v-for="w in todayWorkouts" :key="w.id" class="item">
+              <div class="ico">{{ typeIcon(w.type) }}</div>
+              <div class="main"><b>{{ w.type }} <span v-if="w.muscles&&w.muscles.length" class="badge m">{{ w.muscles.join(' · ') }}</span></b>
+                <small>{{ w.start_time? w.start_time.slice(0,5)+' · ':'' }}{{ w.duration_min }} min · {{ w.intensity }}
+                  · ~{{ Math.round(burnOf(w)) }} kcal</small></div>
+              <button class="x" @click="delWorkout(w.id)">×</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ POIDS ============ -->
+    <div v-show="tab==='poids'">
+      <div class="grid g-3">
+        <div class="card">
+          <h3>Évolution du poids</h3>
+          <div v-if="weights.length<2" class="empty">Ajoutez au moins deux mesures pour voir la courbe.</div>
+          <svg v-else class="chart" :viewBox="'0 0 320 150'" preserveAspectRatio="none" style="height:190px">
+            <line v-if="activeGoal" :x1="0" :x2="320" :y1="goalY" :y2="goalY"
+              stroke="var(--strength)" stroke-width="1" stroke-dasharray="4 4" opacity=".7"/>
+            <polyline :points="chartPoints" fill="none" stroke="var(--ink)" stroke-width="2"
+              stroke-linejoin="round" stroke-linecap="round"/>
+            <circle v-for="(p,idx) in chartDots" :key="idx" :cx="p.x" :cy="p.y" r="3" fill="var(--energy)"/>
+          </svg>
+          <div v-if="weights.length>=2" style="display:flex;justify-content:space-between;margin-top:8px" class="note">
+            <span>{{ minW }} kg</span>
+            <span v-if="activeGoal" style="color:var(--strength)">objectif {{ activeGoal.target_weight_kg }} kg</span>
+            <span>{{ maxW }} kg</span>
+          </div>
+        </div>
+        <div class="card">
+          <h3>Nouvelle mesure</h3>
+          <div class="field"><label>Poids (kg)</label>
+            <input type="number" step="0.1" v-model.number="wForm.weight" placeholder="ex. 78.4" /></div>
+          <div class="field"><label>Date</label>
+            <input type="date" v-model="wForm.date" /></div>
+          <button class="btn full" :disabled="!wForm.weight" @click="addWeight">Enregistrer</button>
+          <div v-if="currentWeight" class="callout info" style="margin-top:16px">
+            <span>📌</span><span>Tous vos objectifs se recalculent automatiquement à partir de votre
+              dernière mesure : <b>{{ currentWeight }} kg</b>.</span>
+          </div>
+        </div>
+      </div>
+      <div class="card" style="margin-top:16px">
+        <h3>Historique <span class="badge">{{ weights.length }}</span></h3>
+        <div class="list">
+          <div v-if="!weights.length" class="empty">Aucune mesure enregistrée.</div>
+          <div v-for="(w,idx) in weightsDesc" :key="w.id" class="item">
+            <div class="ico">⚖️</div>
+            <div class="main"><b>{{ w.weight_kg }} kg</b><small>{{ frDate(w.date) }}</small></div>
+            <div class="amt" :style="idx<weightsDesc.length-1?deltaStyle(w.weight_kg-weightsDesc[idx+1].weight_kg):''">
+              {{ idx<weightsDesc.length-1? signed(w.weight_kg-weightsDesc[idx+1].weight_kg)+' kg':'—' }}</div>
+            <button class="x" @click="delWeight(w.id)">×</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ ENTRAINEMENTS ============ -->
+    <div v-show="tab==='entrainements'">
+      <div class="grid g-3">
+        <div class="card">
+          <h3>Programmer une séance</h3>
+          <div class="row">
+            <div class="field"><label>Date</label><input type="date" v-model="woForm.date" /></div>
+            <div class="field"><label>Heure</label><input type="time" v-model="woForm.start_time" /></div>
+          </div>
+          <div class="row">
+            <div class="field"><label>Type</label>
+              <select v-model="woForm.type">
+                <option v-for="t in workoutTypes" :key="t">{{ t }}</option>
+              </select></div>
+            <div class="field"><label>Durée (min)</label>
+              <input type="number" v-model.number="woForm.duration_min" placeholder="60" /></div>
+          </div>
+          <div class="field"><label>Intensité</label>
+            <select v-model="woForm.intensity">
+              <option>Légère</option><option>Modérée</option><option>Intense</option>
+            </select></div>
+
+          <div v-if="woForm.type==='Musculation'" class="field">
+            <label>Muscles ciblés (au moins un)</label>
+            <div class="muscles">
+              <div v-for="m in muscleGroups" :key="m" class="mtag"
+                :class="{on:woForm.muscles.includes(m)}" @click="toggleMuscle(m)">{{ m }}</div>
+            </div>
+          </div>
+
+          <div class="field"><label>Notes (optionnel)</label>
+            <input type="text" v-model.trim="woForm.notes" placeholder="ex. push day, drop sets…" /></div>
+
+          <div class="callout info" style="margin:0 0 14px">
+            <span>🔥</span><span>Cette séance ajoutera <b>~{{ Math.round(burnOf(woForm)) }} kcal</b> et
+              <b>~{{ Math.round(waterAddOf(woForm)) }} ml</b> d'eau à l'objectif du jour concerné.</span>
+          </div>
+          <button class="btn strength full" :disabled="!validWorkout" @click="addWorkout">Ajouter la séance</button>
+        </div>
+
+        <div class="card">
+          <h3>Séances à venir & récentes</h3>
+          <div class="list">
+            <div v-if="!workouts.length" class="empty">Aucune séance enregistrée.</div>
+            <div v-for="w in workoutsSorted" :key="w.id" class="item">
+              <div class="ico">{{ typeIcon(w.type) }}</div>
+              <div class="main">
+                <b>{{ w.type }}</b>
+                <small>{{ frDate(w.date) }}{{ w.start_time? ' · '+w.start_time.slice(0,5):'' }}
+                  · {{ w.duration_min }} min · {{ w.intensity }}</small>
+                <div v-if="w.muscles&&w.muscles.length" class="muscles" style="margin-top:6px">
+                  <span v-for="m in w.muscles" :key="m" class="badge m">{{ m }}</span>
+                </div>
+              </div>
+              <button class="x" @click="delWorkout(w.id)">×</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ OBJECTIFS ============ -->
+    <div v-show="tab==='objectifs'">
+      <div class="grid g-3">
+        <div class="card">
+          <h3>Fixer un objectif de poids</h3>
+          <div class="field"><label>Poids visé (kg)</label>
+            <input type="number" step="0.1" v-model.number="gForm.target" placeholder="ex. 72" /></div>
+          <div class="field"><label>Échéance (optionnel)</label>
+            <input type="date" v-model="gForm.date" /></div>
+          <button class="btn strength full" :disabled="!gForm.target" @click="saveGoal">Enregistrer l'objectif</button>
+
+          <div v-if="goals.length" class="list" style="margin-top:18px">
+            <div class="eyebrow" style="margin-bottom:8px">Objectifs</div>
+            <div v-for="g in goals" :key="g.id" class="item">
+              <div class="ico">🎯</div>
+              <div class="main"><b>{{ g.target_weight_kg }} kg</b>
+                <small>{{ g.target_date? 'pour le '+frDate(g.target_date):'sans échéance' }}</small></div>
+              <button class="x" @click="delGoal(g.id)">×</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3>Recommandations</h3>
+          <div v-if="!activeGoal || !currentWeight" class="empty">
+            Renseignez votre poids actuel et un objectif pour obtenir un plan.</div>
+          <template v-else>
+            <div class="callout" :class="reco.tone" style="margin-bottom:16px">
+              <span>{{ reco.icon }}</span><span v-html="reco.headline"></span>
+            </div>
+            <div class="kv"><span>Poids actuel</span><b class="num">{{ currentWeight }} kg</b></div>
+            <div class="kv"><span>Objectif</span><b class="num">{{ activeGoal.target_weight_kg }} kg</b></div>
+            <div class="kv"><span>Écart</span><b class="num">{{ signed(activeGoal.target_weight_kg-currentWeight) }} kg</b></div>
+            <div class="kv"><span>Calories / jour (aujourd'hui)</span><b class="num">{{ calorieTarget }} kcal</b></div>
+            <div class="kv"><span>Protéines / jour</span><b class="num">{{ proteinTarget }} g</b></div>
+            <div class="kv"><span>Rythme conseillé</span><b class="num">{{ reco.weeklyRate }} kg/sem.</b></div>
+            <div class="kv"><span>Durée estimée</span><b class="num">{{ reco.eta }}</b></div>
+
+            <div class="eyebrow" style="margin:18px 0 8px">Pour viser ce poids en restant musclé</div>
+            <ul class="note" style="margin:0;padding-left:18px;line-height:1.7">
+              <li v-for="tip in reco.tips" :key="tip" v-html="tip"></li>
+            </ul>
+
+            <div class="callout warn" style="margin-top:16px">
+              <span>ℹ️</span><span>Ces repères sont indicatifs et calculés par des formules standard
+                (Mifflin-St Jeor). Ils ne remplacent pas l'avis d'un médecin ou d'un diététicien,
+                surtout en cas de condition de santé particulière.</span>
+            </div>
+          </template>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ PROFIL ============ -->
+    <div v-show="tab==='profil'">
+      <div class="grid g-2">
+        <div class="card">
+          <h3>Profil</h3>
+          <p class="note" style="margin-top:-6px;margin-bottom:16px">Sert au calcul du métabolisme de base et de vos besoins.</p>
+          <div class="row">
+            <div class="field"><label>Taille (cm)</label>
+              <input type="number" v-model.number="pForm.height_cm" placeholder="178" /></div>
+            <div class="field"><label>Âge</label>
+              <input type="number" v-model.number="pForm.age" placeholder="30" /></div>
+          </div>
+          <div class="field"><label>Sexe (référence métabolique)</label>
+            <select v-model="pForm.sex"><option value="homme">Homme</option><option value="femme">Femme</option></select></div>
+          <div class="field"><label>Activité de base (hors entraînements)</label>
+            <select v-model="pForm.base_activity">
+              <option value="sedentaire">Sédentaire (bureau, peu de marche)</option>
+              <option value="leger">Légère (un peu de marche quotidienne)</option>
+              <option value="modere">Modérée (debout / actif au quotidien)</option>
+              <option value="eleve">Élevée (métier physique)</option>
+            </select></div>
+          <button class="btn full" :disabled="!pForm.height_cm||!pForm.age" @click="saveProfile">Enregistrer le profil</button>
+        </div>
+        <div class="card">
+          <h3>Vos chiffres actuels</h3>
+          <div v-if="!profileReady||!currentWeight" class="empty">Complétez le profil et ajoutez une mesure de poids.</div>
+          <template v-else>
+            <div class="kv"><span>Métabolisme de base (BMR)</span><b class="num">{{ Math.round(bmr) }} kcal</b></div>
+            <div class="kv"><span>Maintenance (avec activité de base)</span><b class="num">{{ Math.round(maintenance) }} kcal</b></div>
+            <div class="kv"><span>Eau de base</span><b class="num">{{ (baseWater/1000).toFixed(2) }} L</b></div>
+            <div class="kv"><span>Objectif calories aujourd'hui</span><b class="num">{{ calorieTarget }} kcal</b></div>
+            <div class="kv"><span>Objectif eau aujourd'hui</span><b class="num">{{ (waterTarget/1000).toFixed(2) }} L</b></div>
+            <p class="note" style="margin-top:14px">Le poids de référence est votre dernière mesure ({{ currentWeight }} kg) :
+              vos besoins évoluent donc avec votre poids.</p>
+          </template>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <transition name="fade"><div v-if="toast" class="toast">{{ toast }}</div></transition>
+</div>
+
+<script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script>
+const { createApp } = Vue;
+const todayISO = () => new Date().toLocaleDateString('sv-SE'); // YYYY-MM-DD local
+
+createApp({
+  data(){
+    return {
+      stage:'loading',            // config | auth | loading | app
+      cfg:{ url:'', key:'' },
+      db:null,
+      session:null,
+      authMode:'in',
+      auth:{ email:'', password:'', busy:false, err:'', msg:'' },
+      tab:'jour',
+      toast:'',
+
+      profile:null,
+      weights:[],
+      workouts:[],
+      intakes:[],
+      goals:[],
+
+      pForm:{ height_cm:null, age:null, sex:'homme', base_activity:'leger' },
+      wForm:{ weight:null, date:todayISO() },
+      woForm:{ date:todayISO(), start_time:'', type:'Musculation', duration_min:60,
+               intensity:'Modérée', muscles:[], notes:'' },
+      gForm:{ target:null, date:'' },
+      quick:{ water:null, food:'', kcal:null },
+
+      workoutTypes:['Musculation','Cardio','HIIT','Endurance','Mobilité','Autre'],
+      muscleGroups:['Pectoraux','Dos','Épaules','Trapèzes','Biceps','Triceps','Avant-bras',
+                    'Quadriceps','Ischio-jambiers','Fessiers','Mollets','Abdominaux'],
+      tabsList:[
+        {id:'jour',label:'Aujourd\'hui'},
+        {id:'poids',label:'Poids'},
+        {id:'entrainements',label:'Entraînements'},
+        {id:'objectifs',label:'Objectifs'},
+        {id:'profil',label:'Profil'},
+      ],
+      sqlSetup:
+`create extension if not exists pgcrypto;
+
+create table if not exists profile (
+  user_id uuid primary key references auth.users on delete cascade,
+  height_cm numeric, age int,
+  sex text default 'homme',
+  base_activity text default 'leger',
+  updated_at timestamptz default now()
+);
+create table if not exists weights (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users on delete cascade,
+  date date not null, weight_kg numeric not null,
+  created_at timestamptz default now()
+);
+create table if not exists workouts (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users on delete cascade,
+  date date not null, start_time time, type text not null,
+  duration_min int, intensity text,
+  muscles text[] default '{}', notes text,
+  created_at timestamptz default now()
+);
+create table if not exists intakes (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users on delete cascade,
+  ts timestamptz not null default now(),
+  kind text not null check (kind in ('calorie','water')),
+  amount numeric not null, label text
+);
+create table if not exists goals (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users on delete cascade,
+  target_weight_kg numeric not null, target_date date,
+  created_at timestamptz default now()
+);
+
+-- Sécurité : chaque utilisateur ne voit que ses données
+alter table profile  enable row level security;
+alter table weights  enable row level security;
+alter table workouts enable row level security;
+alter table intakes  enable row level security;
+alter table goals    enable row level security;
+
+do $$
+declare t text;
+begin
+  foreach t in array array['profile','weights','workouts','intakes','goals'] loop
+    execute format('drop policy if exists own on %I;', t);
+    execute format('create policy own on %I for all using (user_id = auth.uid()) with check (user_id = auth.uid());', t);
+  end loop;
+end $$;`
+    };
+  },
+
+  computed:{
+    profileReady(){ return this.profile && this.profile.height_cm && this.profile.age; },
+    todayLabel(){ return new Date().toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long'}); },
+
+    weightsDesc(){ return [...this.weights].sort((a,b)=> (b.date>a.date?1:-1) || (b.created_at>a.created_at?1:-1)); },
+    currentWeight(){ return this.weightsDesc.length? Number(this.weightsDesc[0].weight_kg) : null; },
+
+    todayIntakes(){ const d=todayISO(); return this.intakes
+      .filter(i=> (i.ts||'').slice(0,10)===d)
+      .sort((a,b)=> b.ts>a.ts?1:-1); },
+    todayWorkouts(){ const d=todayISO(); return this.workouts.filter(w=>w.date===d); },
+    todayCalories(){ return this.todayIntakes.filter(i=>i.kind==='calorie').reduce((s,i)=>s+Number(i.amount),0); },
+    todayWater(){ return this.todayIntakes.filter(i=>i.kind==='water').reduce((s,i)=>s+Number(i.amount),0); },
+    todayBurn(){ return this.todayWorkouts.reduce((s,w)=>s+this.burnOf(w),0); },
+
+    workoutsSorted(){ return [...this.workouts].sort((a,b)=> b.date>a.date?1:-1 || (b.start_time>a.start_time?1:-1)); },
+
+    bmr(){
+      if(!this.profileReady || !this.currentWeight) return 0;
+      const w=this.currentWeight, h=this.profile.height_cm, a=this.profile.age;
+      const base = 10*w + 6.25*h - 5*a;
+      return this.profile.sex==='femme' ? base-161 : base+5;
+    },
+    baseFactor(){ return {sedentaire:1.2,leger:1.35,modere:1.45,eleve:1.6}[this.profile?.base_activity]||1.35; },
+    maintenance(){ return this.bmr ? this.bmr*this.baseFactor + this.todayBurn : 0; },
+
+    activeGoal(){ return this.goals.length? [...this.goals].sort((a,b)=> b.created_at>a.created_at?1:-1)[0] : null; },
+
+    // écart d'objectif -> ajustement calorique
+    goalAdjust(){
+      if(!this.activeGoal || !this.currentWeight || !this.maintenance) return {kcal:0,dir:'maintien',weekly:0};
+      const diff = this.currentWeight - Number(this.activeGoal.target_weight_kg); // + => perdre
+      if(Math.abs(diff)<0.3) return {kcal:0,dir:'maintien',weekly:0};
+      const losing = diff>0;
+      let daily = losing ? -450 : 300;                // repères recomposition "lean"
+      // si échéance fixée, on ajuste (dans des bornes de sécurité)
+      if(this.activeGoal.target_date){
+        const days=Math.max(1,(new Date(this.activeGoal.target_date)-new Date())/86400000);
+        let need=(Math.abs(diff)*7700)/days;          // kcal/j nécessaires
+        need=Math.min(need, losing?750:500);          // borne haute
+        need=Math.max(need, losing?250:150);          // borne basse
+        daily = losing? -need : need;
+      }
+      return {kcal:Math.round(daily), dir:losing?'perte':'prise', weekly:+(daily/7700*7).toFixed(2)};
+    },
+    calorieFloored(){ return this.rawTarget < this.floor; },
+    floor(){ return Math.max(this.bmr, this.profile?.sex==='femme'?1200:1500); },
+    rawTarget(){ return this.maintenance + this.goalAdjust.kcal; },
+    calorieTarget(){
+      if(!this.maintenance) return 2000;
+      return Math.round(Math.max(this.rawTarget, this.floor)/10)*10;
+    },
+    proteinTarget(){
+      if(!this.currentWeight) return 0;
+      const gkg = this.goalAdjust.dir==='perte'?2.0 : 1.8;
+      return Math.round(this.currentWeight*gkg);
+    },
+    baseWater(){ return this.currentWeight? this.currentWeight*35 : 2000; }, // ml
+    waterTarget(){
+      const add=this.todayWorkouts.reduce((s,w)=>s+this.waterAddOf(w),0);
+      return Math.round((this.baseWater+add)/50)*50;
+    },
+
+    // chart
+    chartW(){ return [...this.weights].sort((a,b)=> a.date>b.date?1:-1).slice(-30); },
+    minW(){ let v=Math.min(...this.chartW.map(w=>Number(w.weight_kg))); if(this.activeGoal)v=Math.min(v,Number(this.activeGoal.target_weight_kg)); return +(v).toFixed(1);},
+    maxW(){ let v=Math.max(...this.chartW.map(w=>Number(w.weight_kg))); if(this.activeGoal)v=Math.max(v,Number(this.activeGoal.target_weight_kg)); return +(v).toFixed(1);},
+    yScale(){ const min=this.minW-.5, max=this.maxW+.5; const span=(max-min)||1;
+      return v=> 140 - ((v-min)/span)*130; },
+    chartDots(){ const n=this.chartW.length; return this.chartW.map((w,i)=>({
+        x: n>1? (i/(n-1))*320 : 160, y: this.yScale(Number(w.weight_kg)) })); },
+    chartPoints(){ return this.chartDots.map(p=>p.x.toFixed(1)+','+p.y.toFixed(1)).join(' '); },
+    goalY(){ return this.activeGoal? this.yScale(Number(this.activeGoal.target_weight_kg)) : 0; },
+
+    validWorkout(){
+      if(!this.woForm.duration_min) return false;
+      if(this.woForm.type==='Musculation' && !this.woForm.muscles.length) return false;
+      return true;
+    },
+
+    reco(){
+      const g=this.activeGoal; if(!g||!this.currentWeight) return {};
+      const diff = Number(g.target_weight_kg)-this.currentWeight;
+      const adj=this.goalAdjust;
+      let tone='info',icon='🎯',headline='';
+      const tips=[];
+      if(adj.dir==='maintien'){
+        tone='good'; icon='✅';
+        headline='Vous êtes à votre objectif. Cap sur le <b>maintien</b> et la qualité musculaire.';
+        tips.push('Gardez un apport protéiné élevé (<b>'+this.proteinTarget+' g/j</b>) pour continuer à progresser en force.');
+        tips.push('Musculation <b>3 à 5×/semaine</b> avec surcharge progressive.');
+      } else if(adj.dir==='perte'){
+        tone='info'; icon='📉';
+        headline='Objectif : perdre <b>'+Math.abs(diff).toFixed(1)+' kg</b> en préservant le muscle (déficit modéré ~'+Math.abs(adj.kcal)+' kcal/j).';
+        tips.push('Visez un déficit <b>lent</b> (~'+Math.abs(adj.weekly)+' kg/sem.) : trop rapide = perte de muscle.');
+        tips.push('Protéines hautes : <b>'+this.proteinTarget+' g/j</b> (~2 g/kg) pour protéger la masse maigre.');
+        tips.push('Conservez la <b>musculation lourde</b> : c\'est le signal qui dit au corps de garder le muscle.');
+        tips.push('Priorité <b>sommeil</b> (7–9 h) et gestion du stress : essentiels à la récupération.');
+      } else {
+        tone='info'; icon='📈';
+        headline='Objectif : prendre <b>'+Math.abs(diff).toFixed(1)+' kg</b> en <b>prise de masse propre</b> (léger surplus ~'+adj.kcal+' kcal/j).';
+        tips.push('Surplus <b>léger</b> (~+'+adj.weekly+' kg/sem.) pour maximiser le muscle et limiter le gras.');
+        tips.push('Protéines : <b>'+this.proteinTarget+' g/j</b>, réparties sur la journée.');
+        tips.push('Surcharge progressive en musculation : augmentez charges/répétitions régulièrement.');
+        tips.push('Répartissez le volume sur tous les groupes musculaires au fil de la semaine.');
+      }
+      // échéance
+      let eta='—';
+      if(adj.dir!=='maintien' && adj.weekly!==0){
+        const weeks=Math.abs(diff/adj.weekly);
+        eta = weeks<1.5? 'moins de 2 semaines'
+          : weeks<8? Math.round(weeks)+' semaines'
+          : (weeks/4.345).toFixed(1)+' mois';
+      }
+      // avertissement échéance trop agressive
+      if(g.target_date){
+        const days=Math.max(1,(new Date(g.target_date)-new Date())/86400000);
+        const need=(Math.abs(diff)*7700)/days;
+        const cap = adj.dir==='perte'?750:500;
+        if(need>cap){
+          tone='warn'; icon='⚠️';
+          headline='L\'échéance est <b>trop rapprochée</b> pour un progrès sain. Le plan ci-dessous vise un rythme sûr ; envisagez de repousser la date.';
+        }
+      }
+      return {tone,icon,headline,tips,eta,weeklyRate:Math.abs(adj.weekly)};
+    }
+  },
+
+  async mounted(){
+    const saved=JSON.parse(localStorage.getItem('cadence_cfg')||'null');
+    if(saved && saved.url && saved.key){ this.cfg=saved; await this.initClient(); }
+    else this.stage='config';
+  },
+
+  methods:{
+    flash(m){ this.toast=m; clearTimeout(this._t); this._t=setTimeout(()=>this.toast='',2200); },
+    pct(v,t){ if(!t) return 0; return Math.min(100, Math.max(0, (v/t)*100)); },
+    signed(n){ n=Number(n); return (n>0?'+':'')+n.toFixed(1); },
+    deltaStyle(n){ return n<0?'color:var(--good)': n>0?'color:var(--energy)':''; },
+    timeOf(ts){ return new Date(ts).toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'}); },
+    frDate(d){ return new Date(d+'T00:00:00').toLocaleDateString('fr-FR',{day:'numeric',month:'short',year:'2-digit'}); },
+    typeIcon(t){ return {Musculation:'🏋️',Cardio:'🏃',HIIT:'⚡',Endurance:'🚴',Mobilité:'🧘',Autre:'🤸'}[t]||'💪'; },
+
+    async saveConfig(){
+      localStorage.setItem('cadence_cfg', JSON.stringify(this.cfg));
+      await this.initClient();
+    },
+    async initClient(){
+      try{
+        this.db = supabase.createClient(this.cfg.url, this.cfg.key);
+      }catch(e){ this.stage='config'; return; }
+      const { data:{ session } } = await this.db.auth.getSession();
+      if(session){ this.session=session; await this.boot(); }
+      else this.stage='auth';
+      this.db.auth.onAuthStateChange((_e,s)=>{
+        this.session=s;
+        if(!s) this.stage='auth';
+      });
+    },
+
+    async doAuth(){
+      this.auth.err=''; this.auth.msg=''; this.auth.busy=true;
+      try{
+        const fn = this.authMode==='in' ? 'signInWithPassword' : 'signUp';
+        const { data, error } = await this.db.auth[fn]({ email:this.auth.email, password:this.auth.password });
+        if(error) throw error;
+        if(this.authMode==='up' && !data.session){
+          this.auth.msg='Compte créé. Vérifiez vos e-mails pour confirmer, puis connectez-vous.';
+          this.authMode='in'; this.auth.busy=false; return;
+        }
+        this.session=data.session; await this.boot();
+      }catch(e){ this.auth.err = e.message || 'Échec de connexion.'; }
+      this.auth.busy=false;
+    },
+    async signOut(){ await this.db.auth.signOut(); this.resetData(); this.stage='auth'; },
+    resetData(){ this.profile=null; this.weights=[]; this.workouts=[]; this.intakes=[]; this.goals=[]; },
+
+    async boot(){
+      this.stage='loading';
+      await this.loadAll();
+      if(this.profile){
+        this.pForm={ height_cm:this.profile.height_cm, age:this.profile.age,
+          sex:this.profile.sex||'homme', base_activity:this.profile.base_activity||'leger' };
+      }
+      this.stage='app';
+      this.tab = this.profileReady ? 'jour' : 'profil';
+    },
+
+    async loadAll(){
+      const uid=this.session.user.id;
+      const [p,w,wo,i,g] = await Promise.all([
+        this.db.from('profile').select('*').eq('user_id',uid).maybeSingle(),
+        this.db.from('weights').select('*').eq('user_id',uid),
+        this.db.from('workouts').select('*').eq('user_id',uid),
+        this.db.from('intakes').select('*').eq('user_id',uid).gte('ts', this.since(7)),
+        this.db.from('goals').select('*').eq('user_id',uid),
+      ]);
+      this.profile=p.data||null;
+      this.weights=w.data||[];
+      this.workouts=wo.data||[];
+      this.intakes=i.data||[];
+      this.goals=g.data||[];
+    },
+    since(days){ const d=new Date(); d.setDate(d.getDate()-days); return d.toISOString(); },
+
+    async saveProfile(){
+      const uid=this.session.user.id;
+      const payload={ user_id:uid, ...this.pForm, updated_at:new Date().toISOString() };
+      const { data,error } = await this.db.from('profile').upsert(payload).select().single();
+      if(error) return this.flash('Erreur : '+error.message);
+      this.profile=data; this.flash('Profil enregistré'); if(this.tab==='profil') this.tab='jour';
+    },
+
+    async addWeight(){
+      const { data,error } = await this.db.from('weights')
+        .insert({ user_id:this.session.user.id, weight_kg:this.wForm.weight, date:this.wForm.date })
+        .select().single();
+      if(error) return this.flash('Erreur : '+error.message);
+      this.weights.push(data); this.wForm.weight=null; this.flash('Poids enregistré');
+    },
+    async delWeight(id){ await this.db.from('weights').delete().eq('id',id); this.weights=this.weights.filter(w=>w.id!==id); },
+
+    async quickWater(ml){
+      if(!ml||ml<=0) return;
+      const { data,error } = await this.db.from('intakes')
+        .insert({ user_id:this.session.user.id, kind:'water', amount:ml, label:'Eau' })
+        .select().single();
+      if(error) return this.flash('Erreur : '+error.message);
+      this.intakes.push(data); this.flash('+ '+ml+' ml');
+    },
+    async addCalories(){
+      if(!this.quick.kcal) return;
+      const { data,error } = await this.db.from('intakes')
+        .insert({ user_id:this.session.user.id, kind:'calorie', amount:this.quick.kcal,
+                  label:this.quick.food||'Repas' }).select().single();
+      if(error) return this.flash('Erreur : '+error.message);
+      this.intakes.push(data); this.quick.food=''; this.quick.kcal=null; this.flash('Calories ajoutées');
+    },
+    async delIntake(id){ await this.db.from('intakes').delete().eq('id',id); this.intakes=this.intakes.filter(i=>i.id!==id); },
+
+    toggleMuscle(m){
+      const a=this.woForm.muscles;
+      a.includes(m)? a.splice(a.indexOf(m),1) : a.push(m);
+    },
+    async addWorkout(){
+      if(!this.validWorkout) return;
+      const f=this.woForm;
+      const payload={ user_id:this.session.user.id, date:f.date, start_time:f.start_time||null,
+        type:f.type, duration_min:f.duration_min, intensity:f.intensity,
+        muscles: f.type==='Musculation'? f.muscles : [], notes:f.notes||null };
+      const { data,error } = await this.db.from('workouts').insert(payload).select().single();
+      if(error) return this.flash('Erreur : '+error.message);
+      this.workouts.push(data);
+      this.flash('Séance ajoutée');
+      this.woForm={ date:todayISO(), start_time:'', type:'Musculation', duration_min:60,
+        intensity:'Modérée', muscles:[], notes:'' };
+    },
+    async delWorkout(id){ await this.db.from('workouts').delete().eq('id',id); this.workouts=this.workouts.filter(w=>w.id!==id); },
+
+    async saveGoal(){
+      const { data,error } = await this.db.from('goals')
+        .insert({ user_id:this.session.user.id, target_weight_kg:this.gForm.target,
+                  target_date:this.gForm.date||null }).select().single();
+      if(error) return this.flash('Erreur : '+error.message);
+      this.goals.push(data); this.gForm={ target:null, date:'' }; this.flash('Objectif enregistré');
+    },
+    async delGoal(id){ await this.db.from('goals').delete().eq('id',id); this.goals=this.goals.filter(g=>g.id!==id); },
+
+    // --- calculs séance ---
+    metOf(w){
+      const t=w.type, inten=w.intensity;
+      const table={
+        Musculation:{'Légère':3.5,'Modérée':5,'Intense':6},
+        Cardio:{'Légère':5,'Modérée':7,'Intense':9},
+        HIIT:{'Légère':7,'Modérée':9,'Intense':11},
+        Endurance:{'Légère':7,'Modérée':9,'Intense':11},
+        Mobilité:{'Légère':2.3,'Modérée':2.8,'Intense':3.5},
+        Autre:{'Légère':3,'Modérée':4,'Intense':6},
+      };
+      return (table[t]||table.Autre)[inten] || 4;
+    },
+    burnOf(w){
+      const kg=this.currentWeight||75;
+      const h=(w.duration_min||0)/60;
+      return this.metOf(w)*kg*h;
+    },
+    waterAddOf(w){
+      const h=(w.duration_min||0)/60;
+      const factor={Musculation:500,Cardio:700,HIIT:700,Endurance:700,Mobilité:250,Autre:450}[w.type]||450;
+      return factor*h;
+    },
+  }
+}).mount('#app');
+</script>
+</body>
+</html>
