@@ -171,10 +171,9 @@
   .empty{text-align:center;color:var(--faint);font-size:14px;padding:26px 10px}
 
   .badge{display:inline-block;font-size:11.5px;font-weight:600;padding:3px 9px;border-radius:999px;
-    background:var(--canvas);color:var(--slate)}
+    background:var(--canvas);color:var(--slate);max-width:100%;overflow-wrap:anywhere;white-space:normal}
   .badge.m{background:var(--strength-bg);color:var(--strength)}
-
-  .muscles{display:flex;flex-wrap:wrap;gap:7px;margin-top:4px}
+  .muscles{display:flex;flex-wrap:wrap;gap:7px;margin-top:4px;min-width:0}
   .mtag{border:1px solid var(--hairline);border-radius:8px;padding:6px 11px;font-size:13px;
     cursor:pointer;user-select:none;transition:.12s;background:#fff}
   .mtag.on{background:var(--strength);color:#fff;border-color:var(--strength)}
@@ -213,6 +212,44 @@
   .spinner{width:34px;height:34px;border:3px solid var(--hairline);border-top-color:var(--strength);
     border-radius:50%;animation:spin .8s linear infinite;margin:40px auto}
   @keyframes spin{to{transform:rotate(360deg)}}
+
+  /* ---------- gamification ---------- */
+  .hero-rank{display:flex;align-items:center;gap:15px}
+  .rank-emblem{width:60px;height:60px;flex:none;border-radius:17px;display:grid;place-items:center;
+    font-size:30px;box-shadow:inset 0 0 0 2px rgba(255,255,255,.6)}
+  .rank-top{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+  .rank-top b{font-family:var(--display);font-size:17px;letter-spacing:-.01em}
+  .xpbar{height:10px;background:var(--canvas);border-radius:999px;overflow:hidden;margin:9px 0 5px}
+  .xpbar i{display:block;height:100%;border-radius:999px;
+    background:linear-gradient(90deg,var(--water),var(--strength));transition:width .6s cubic-bezier(.4,0,.2,1)}
+  .gstats{display:flex;gap:10px;flex-wrap:wrap;margin-top:4px}
+  .gstat{flex:1;min-width:90px;background:var(--canvas);border-radius:12px;padding:12px 14px;text-align:center}
+  .gstat .v{font-family:var(--display);font-size:23px}
+  .gstat .k{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--slate);margin-top:2px}
+  .ach-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(138px,1fr));gap:11px}
+  .ach{border:1px solid var(--hairline);border-radius:14px;padding:14px 12px;text-align:center;position:relative;
+    transition:.2s;background:#fff}
+  .ach.on{border-color:transparent;box-shadow:0 2px 10px rgba(91,61,245,.12);
+    background:linear-gradient(180deg,#fff, #FAF9FF)}
+  .ach.off{opacity:.6}
+  .ach .e{font-size:27px;line-height:1}
+  .ach.off .e{filter:grayscale(1);opacity:.55}
+  .ach b{display:block;font-size:13px;margin-top:7px;font-family:var(--display)}
+  .ach small{display:block;font-size:11px;color:var(--slate);margin-top:3px;line-height:1.35}
+  .ach .lock{position:absolute;top:9px;right:10px;font-size:12px;opacity:.5}
+  .ach .chk{position:absolute;top:8px;right:9px;width:18px;height:18px;border-radius:50%;background:var(--good);
+    color:#fff;font-size:12px;display:grid;place-items:center}
+  .rankrow{display:flex;align-items:center;gap:9px;padding:9px 0;border-bottom:1px solid var(--hairline)}
+  .rankrow:last-child{border-bottom:none}
+  .rankrow.cur{font-weight:600}
+  .rankrow .re{width:30px;height:30px;border-radius:9px;display:grid;place-items:center;font-size:16px;flex:none}
+  .rankrow small{margin-left:auto;color:var(--faint);font-size:12px}
+  .levelup{position:fixed;inset:0;z-index:60;display:grid;place-items:center;background:rgba(24,26,31,.55);
+    backdrop-filter:blur(3px);padding:24px}
+  .levelup .box{background:#fff;border-radius:20px;padding:30px 26px;text-align:center;max-width:340px;width:100%;
+    box-shadow:var(--shadow);animation:pop .35s cubic-bezier(.2,1.3,.5,1)}
+  .levelup .big{font-size:52px;line-height:1;margin-bottom:6px}
+  @keyframes pop{from{transform:scale(.8);opacity:0}to{transform:scale(1);opacity:1}}
 
   @media (prefers-reduced-motion: reduce){
     *{transition:none!important;animation:none!important}
@@ -298,6 +335,22 @@
 
     <!-- ============ DASHBOARD ============ -->
     <div v-show="tab==='jour'">
+      <div v-if="currentWeight||weights.length||workouts.length||intakes.length" class="card" style="margin-bottom:16px;cursor:pointer" @click="tab='progression'">
+        <div class="hero-rank">
+          <div class="rank-emblem" :style="{background:rankData.color+'22',color:rankData.color}">{{ rankData.icon }}</div>
+          <div style="flex:1;min-width:0">
+            <div class="rank-top">
+              <b>{{ rankData.name }}</b>
+              <span class="badge" :style="{background:rankData.color+'1f',color:rankData.color}">Niveau {{ levelData.level }}</span>
+            </div>
+            <div class="xpbar"><i :style="{width:levelData.pct+'%'}"></i></div>
+            <div class="note" style="font-size:12px;display:flex;justify-content:space-between;gap:8px">
+              <span>{{ levelData.into }} / {{ levelData.need }} XP</span>
+              <span>🔥 {{ streak }} j · +{{ todayXP }} XP aujourd'hui</span>
+            </div>
+          </div>
+        </div>
+      </div>
       <div class="grid dash">
         <!-- gauges -->
         <div class="card">
@@ -380,11 +433,16 @@
           <div class="list">
             <div v-if="!todayWorkouts.length" class="empty">Aucune séance planifiée aujourd'hui.
               <br /><a href="#" @click.prevent="tab='entrainements'">Programmer une séance →</a></div>
-            <div v-for="w in todayWorkouts" :key="w.id" class="item">
+            <div v-for="w in todayWorkouts" :key="w.id" class="item" style="align-items:flex-start">
               <div class="ico">{{ typeIcon(w.type) }}</div>
-              <div class="main"><b>{{ w.type }} <span v-if="w.muscles&&w.muscles.length" class="badge m">{{ w.muscles.join(' · ') }}</span></b>
+              <div class="main">
+                <b>{{ w.type }}</b>
                 <small>{{ w.start_time? w.start_time.slice(0,5)+' · ':'' }}{{ w.duration_min }} min · {{ w.intensity }}
-                  · ~{{ Math.round(burnOf(w)) }} kcal</small></div>
+                  · ~{{ Math.round(burnOf(w)) }} kcal</small>
+                <div v-if="w.muscles&&w.muscles.length" class="muscles" style="margin-top:6px">
+                  <span v-for="m in w.muscles" :key="m" class="badge m">{{ m }}</span>
+                </div>
+              </div>
               <button class="x" @click="delWorkout(w.id)">×</button>
             </div>
           </div>
@@ -397,19 +455,29 @@
       <div class="grid g-3">
         <div class="card">
           <h3>Évolution du poids</h3>
-          <div v-if="weights.length<2" class="empty">Ajoutez au moins deux mesures pour voir la courbe.</div>
-          <svg v-else class="chart" :viewBox="'0 0 320 150'" preserveAspectRatio="none" style="height:190px">
-            <line v-if="activeGoal" :x1="0" :x2="320" :y1="goalY" :y2="goalY"
-              stroke="var(--strength)" stroke-width="1" stroke-dasharray="4 4" opacity=".7"/>
-            <polyline :points="chartPoints" fill="none" stroke="var(--ink)" stroke-width="2"
-              stroke-linejoin="round" stroke-linecap="round"/>
-            <circle v-for="(p,idx) in chartDots" :key="idx" :cx="p.x" :cy="p.y" r="3" fill="var(--energy)"/>
-          </svg>
-          <div v-if="weights.length>=2" style="display:flex;justify-content:space-between;margin-top:8px" class="note">
-            <span>{{ minW }} kg</span>
-            <span v-if="activeGoal" style="color:var(--strength)">objectif {{ activeGoal.target_weight_kg }} kg</span>
-            <span>{{ maxW }} kg</span>
-          </div>
+          <div v-if="!chartGeo" class="empty">Ajoutez au moins deux mesures pour voir la courbe.</div>
+          <template v-else>
+            <svg class="chart" :viewBox="'0 0 '+chartGeo.W+' '+chartGeo.H" style="height:210px">
+              <defs>
+                <linearGradient id="wgrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0" stop-color="var(--energy)" stop-opacity="0.20" />
+                  <stop offset="1" stop-color="var(--energy)" stop-opacity="0" />
+                </linearGradient>
+              </defs>
+              <path :d="chartGeo.area" fill="url(#wgrad)" />
+              <line v-if="chartGeo.goalY!=null" :x1="chartGeo.padX" :x2="chartGeo.W-chartGeo.padX"
+                :y1="chartGeo.goalY" :y2="chartGeo.goalY"
+                stroke="var(--strength)" stroke-width="1" stroke-dasharray="4 4" opacity="0.8" />
+              <polyline :points="chartGeo.line" fill="none" stroke="var(--ink)" stroke-width="2"
+                stroke-linejoin="round" stroke-linecap="round" />
+              <circle v-for="(d,i) in chartGeo.dots" :key="i" :cx="d.x" :cy="d.y" r="3" fill="var(--energy)" />
+            </svg>
+            <div class="note" style="display:flex;justify-content:space-between;gap:8px;margin-top:2px">
+              <span>{{ frDate(chartGeo.startDate) }}</span>
+              <span v-if="activeGoal" style="color:var(--strength)">🎯 {{ activeGoal.target_weight_kg }} kg</span>
+              <span>{{ frDate(chartGeo.endDate) }}</span>
+            </div>
+          </template>
         </div>
         <div class="card">
           <h3>Nouvelle mesure</h3>
@@ -570,6 +638,71 @@
       </div>
     </div>
 
+    <!-- ============ PROGRESSION ============ -->
+    <div v-show="tab==='progression'">
+      <div class="grid g-3">
+        <div class="card">
+          <h3>Votre rang</h3>
+          <div class="hero-rank">
+            <div class="rank-emblem" :style="{background:rankData.color+'22',color:rankData.color}">{{ rankData.icon }}</div>
+            <div style="flex:1;min-width:0">
+              <div class="rank-top">
+                <b>{{ rankData.name }}</b>
+                <span class="badge" :style="{background:rankData.color+'1f',color:rankData.color}">Niveau {{ levelData.level }}</span>
+              </div>
+              <div class="xpbar"><i :style="{width:levelData.pct+'%'}"></i></div>
+              <div class="note" style="font-size:12px">{{ levelData.into }} / {{ levelData.need }} XP vers le niveau {{ levelData.level+1 }}</div>
+            </div>
+          </div>
+
+          <div class="gstats" style="margin-top:16px">
+            <div class="gstat"><div class="v num">🔥 {{ streak }}</div><div class="k">Série en cours</div></div>
+            <div class="gstat"><div class="v num">{{ maxStreak }}</div><div class="k">Record</div></div>
+            <div class="gstat"><div class="v num">{{ totalXP }}</div><div class="k">XP total</div></div>
+            <div class="gstat"><div class="v num">{{ activeDaysCount }}</div><div class="k">Jours actifs</div></div>
+          </div>
+
+          <div v-if="rankData.next" class="callout info" style="margin-top:16px">
+            <span>{{ rankData.next.icon }}</span>
+            <span>Prochain rang : <b>{{ rankData.next.name }}</b> au niveau {{ rankData.next.min }}
+              ({{ xpToNextRank }} XP restants).</span>
+          </div>
+          <div v-else class="callout good" style="margin-top:16px">
+            <span>🌟</span><span>Rang maximal atteint : vous êtes une <b>Légende</b>. Continuez à cumuler des niveaux !</span>
+          </div>
+
+          <div class="eyebrow" style="margin:18px 0 6px">Comment gagner de l'XP</div>
+          <div class="note" style="line-height:1.7">
+            Boire de l'eau <b>+10</b> · atteindre son eau du jour est déjà tracké dans les jauges ·
+            enregistrer un repas <b>+10</b> · réaliser une séance <b>+25</b> · se peser <b>+15</b> ·
+            journée complète (eau + repas + séance) <b>+20</b>. Chaque succès débloqué rapporte un bonus.
+          </div>
+        </div>
+
+        <div class="card">
+          <h3>Échelle des rangs</h3>
+          <div class="rankrow" v-for="r in rankLadder" :key="r.name" :class="{cur:r.name===rankData.name}">
+            <div class="re" :style="{background:r.color+'22',color:r.color}">{{ r.icon }}</div>
+            <span>{{ r.name }}</span>
+            <small>niv. {{ r.min }}<span v-if="r.name===rankData.name"> · vous êtes ici</span></small>
+          </div>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top:16px">
+        <h3>Succès <span class="badge">{{ unlockedCount }} / {{ achievements.length }}</span></h3>
+        <div class="ach-grid">
+          <div v-for="a in achievements" :key="a.id" class="ach" :class="a.done?'on':'off'">
+            <div v-if="a.done" class="chk">✓</div>
+            <div v-else class="lock">🔒</div>
+            <div class="e">{{ a.icon }}</div>
+            <b>{{ a.name }}</b>
+            <small>{{ a.desc }}</small>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- ============ PROFIL ============ -->
     <div v-show="tab==='profil'">
       <div class="grid g-2">
@@ -611,6 +744,17 @@
 
   </div>
 
+  <transition name="fade">
+    <div v-if="levelUp" class="levelup" @click="levelUp=null">
+      <div class="box">
+        <div class="big">{{ levelUp.icon }}</div>
+        <div class="eyebrow" style="color:var(--strength)">Niveau supérieur</div>
+        <h2 style="font-size:24px;margin:6px 0 4px">Niveau {{ levelUp.level }}</h2>
+        <p class="note" style="margin:0">Rang : <b>{{ levelUp.rank }}</b>. Continuez comme ça 💪</p>
+        <button class="btn strength full" style="margin-top:18px" @click="levelUp=null">Continuer</button>
+      </div>
+    </div>
+  </transition>
   <transition name="fade"><div v-if="toast" class="toast">{{ toast }}</div></transition>
 </div>
 
@@ -665,6 +809,8 @@ const __app = createApp({
       auth:{ email:'', password:'', busy:false, err:'', msg:'' },
       tab:'jour',
       toast:'',
+      levelUp:null,
+      _lastLevel:null,
 
       profile:null,
       weights:[],
@@ -684,6 +830,7 @@ const __app = createApp({
                     'Quadriceps','Ischio-jambiers','Fessiers','Mollets','Abdominaux'],
       tabsList:[
         {id:'jour',label:'Aujourd\'hui'},
+        {id:'progression',label:'Progression'},
         {id:'poids',label:'Poids'},
         {id:'entrainements',label:'Entraînements'},
         {id:'objectifs',label:'Objectifs'},
@@ -808,16 +955,147 @@ end $$;`
       return Math.round((this.baseWater+add)/50)*50;
     },
 
-    // chart
-    chartW(){ return [...this.weights].sort((a,b)=> a.date>b.date?1:-1).slice(-30); },
-    minW(){ let v=Math.min(...this.chartW.map(w=>Number(w.weight_kg))); if(this.activeGoal)v=Math.min(v,Number(this.activeGoal.target_weight_kg)); return +(v).toFixed(1);},
-    maxW(){ let v=Math.max(...this.chartW.map(w=>Number(w.weight_kg))); if(this.activeGoal)v=Math.max(v,Number(this.activeGoal.target_weight_kg)); return +(v).toFixed(1);},
-    yScale(){ const min=this.minW-.5, max=this.maxW+.5; const span=(max-min)||1;
-      return v=> 140 - ((v-min)/span)*130; },
-    chartDots(){ const n=this.chartW.length; return this.chartW.map((w,i)=>({
-        x: n>1? (i/(n-1))*320 : 160, y: this.yScale(Number(w.weight_kg)) })); },
-    chartPoints(){ return this.chartDots.map(p=>p.x.toFixed(1)+','+p.y.toFixed(1)).join(' '); },
-    goalY(){ return this.activeGoal? this.yScale(Number(this.activeGoal.target_weight_kg)) : 0; },
+    // chart — axe X proportionnel au temps réel entre les mesures
+    chartW(){ return [...this.weights].sort((a,b)=> a.date>b.date?1:-1).slice(-60); },
+    chartGeo(){
+      const pts=this.chartW;
+      if(pts.length<2) return null;
+      const W=320, H=170, padX=10, padTop=14, padBot=30;
+      const times=pts.map(p=> new Date(p.date+'T00:00:00').getTime());
+      const minT=times[0], maxT=times[times.length-1];
+      const spanT=(maxT-minT)||1;
+      const vals=pts.map(p=>Number(p.weight_kg));
+      let lo=Math.min(...vals), hi=Math.max(...vals);
+      if(this.activeGoal){ const g=Number(this.activeGoal.target_weight_kg); lo=Math.min(lo,g); hi=Math.max(hi,g); }
+      const padV=(hi-lo)*0.18 || 1; lo-=padV; hi+=padV;
+      const spanV=(hi-lo)||1;
+      const X=t=> padX + ((t-minT)/spanT)*(W-2*padX);
+      const Y=v=> padTop + (1-(v-lo)/spanV)*(H-padTop-padBot);
+      const dots=pts.map((p,i)=>({ x:X(times[i]), y:Y(Number(p.weight_kg)) }));
+      const line=dots.map(d=> d.x.toFixed(1)+','+d.y.toFixed(1)).join(' ');
+      const base=(H-padBot).toFixed(1);
+      const area='M'+dots[0].x.toFixed(1)+','+base+' L'
+        +dots.map(d=> d.x.toFixed(1)+','+d.y.toFixed(1)).join(' L')
+        +' L'+dots[dots.length-1].x.toFixed(1)+','+base+' Z';
+      return { W,H,padX, dots, line, area,
+        goalY: this.activeGoal? Y(Number(this.activeGoal.target_weight_kg)) : null,
+        startDate:pts[0].date, endDate:pts[pts.length-1].date };
+    },
+
+    // ----- gamification -----
+    loggedDays(){
+      const s=new Set();
+      this.intakes.forEach(i=>{ const d=(i.ts||'').slice(0,10); if(d) s.add(d); });
+      this.workouts.forEach(w=>{ if(w.date) s.add(w.date); });
+      this.weights.forEach(w=>{ if(w.date) s.add(w.date); });
+      return s;
+    },
+    activeDaysCount(){ return this.loggedDays.size; },
+    streak(){
+      const days=this.loggedDays; let count=0; const d=new Date();
+      if(!days.has(todayISO())) d.setDate(d.getDate()-1);
+      for(;;){ const ds=d.toLocaleDateString('sv-SE'); if(days.has(ds)){ count++; d.setDate(d.getDate()-1); } else break; }
+      return count;
+    },
+    maxStreak(){
+      const days=[...this.loggedDays].sort(); let best=0,cur=0,prev=null;
+      days.forEach(ds=>{
+        if(prev){ const diff=Math.round((new Date(ds)-new Date(prev))/86400000); cur = diff===1? cur+1 : 1; }
+        else cur=1;
+        if(cur>best) best=cur; prev=ds;
+      });
+      return best;
+    },
+    dayFlags(){
+      const by={};
+      const f=(d)=> (by[d]=by[d]||{});
+      this.intakes.forEach(i=>{ const d=(i.ts||'').slice(0,10); if(!d)return; f(d)[i.kind==='water'?'water':'food']=true; });
+      this.workouts.forEach(w=>{ if(w.date) f(w.date).workout=true; });
+      this.weights.forEach(w=>{ if(w.date) f(w.date).weight=true; });
+      return by;
+    },
+    dailyXP(){
+      let xp=0;
+      Object.values(this.dayFlags).forEach(fl=>{
+        if(fl.water) xp+=10;
+        if(fl.food) xp+=10;
+        if(fl.workout) xp+=25;
+        if(fl.weight) xp+=15;
+        if(fl.water&&fl.food&&fl.workout) xp+=20;
+      });
+      return xp;
+    },
+    todayXP(){
+      const fl=this.dayFlags[todayISO()]||{}; let xp=0;
+      if(fl.water) xp+=10; if(fl.food) xp+=10; if(fl.workout) xp+=25; if(fl.weight) xp+=15;
+      if(fl.water&&fl.food&&fl.workout) xp+=20;
+      return xp;
+    },
+    hydrationDays(){
+      const by={};
+      this.intakes.filter(i=>i.kind==='water').forEach(i=>{ const d=(i.ts||'').slice(0,10); by[d]=(by[d]||0)+Number(i.amount); });
+      return Object.values(by).filter(v=> v>=2000).length;
+    },
+    muscleSet(){ const s=new Set(); this.workouts.forEach(w=> (w.muscles||[]).forEach(m=> s.add(m))); return s; },
+    musculationCount(){ return this.workouts.filter(w=> w.type==='Musculation').length; },
+    cardioCount(){ return this.workouts.filter(w=> ['Cardio','HIIT','Endurance'].includes(w.type)).length; },
+    totalLogs(){ return this.intakes.length + this.workouts.length + this.weights.length; },
+    goalReached(){
+      if(!this.activeGoal || !this.currentWeight) return false;
+      return Math.abs(this.currentWeight - Number(this.activeGoal.target_weight_kg)) <= 0.3;
+    },
+    achievements(){
+      const defs=[
+        {id:'first_water', icon:'💧', name:'Première goutte', desc:'Enregistrer de l\'eau',           done:this.intakes.some(i=>i.kind==='water'), xp:30},
+        {id:'first_food',  icon:'🍽️', name:'Premier repas',   desc:'Enregistrer des calories',        done:this.intakes.some(i=>i.kind==='calorie'), xp:30},
+        {id:'first_wo',    icon:'💪', name:'Premier effort',   desc:'Réaliser une séance',             done:this.workouts.length>0, xp:40},
+        {id:'first_weigh', icon:'⚖️', name:'Sur la balance',   desc:'Première pesée',                  done:this.weights.length>0, xp:30},
+        {id:'streak7',     icon:'🔥', name:'Semaine de feu',   desc:'Série de 7 jours',                done:this.maxStreak>=7, xp:80},
+        {id:'streak30',    icon:'🏆', name:'Inarrêtable',      desc:'Série de 30 jours',               done:this.maxStreak>=30, xp:200},
+        {id:'logs100',     icon:'📈', name:'Centurion',        desc:'100 saisies au total',            done:this.totalLogs>=100, xp:120},
+        {id:'muscu10',     icon:'🏋️', name:'Force',            desc:'10 séances de musculation',       done:this.musculationCount>=10, xp:100},
+        {id:'cardio10',    icon:'🏃', name:'Souffle',          desc:'10 séances cardio / HIIT',        done:this.cardioCount>=10, xp:100},
+        {id:'fullbody',    icon:'🧬', name:'Full body',        desc:'Travailler tous les muscles',     done:this.muscleSet.size>=this.muscleGroups.length, xp:150},
+        {id:'hydra10',     icon:'🌊', name:'Hydratation',      desc:'10 jours à 2 L d\'eau ou +',       done:this.hydrationDays>=10, xp:90},
+        {id:'weigh10',     icon:'📅', name:'Suivi rigoureux',  desc:'Se peser sur 10 jours',           done:new Set(this.weights.map(w=>w.date)).size>=10, xp:90},
+        {id:'goal',        icon:'🎯', name:'Objectif atteint', desc:'Atteindre son poids cible',       done:this.goalReached, xp:250},
+      ];
+      return defs;
+    },
+    unlockedCount(){ return this.achievements.filter(a=>a.done).length; },
+    achievementXP(){ return this.achievements.filter(a=>a.done).reduce((s,a)=>s+a.xp,0); },
+    totalXP(){ return this.dailyXP + this.achievementXP; },
+    levelData(){
+      let into=this.totalXP, level=1, need=100;
+      while(into>=need){ into-=need; level++; need=level*100; }
+      return { level, into, need, pct: Math.min(100, Math.round(into/need*100)) };
+    },
+    rankLadder(){
+      return [
+        {min:1, name:'Débutant',  icon:'🌱', color:'#6B7280'},
+        {min:3, name:'Apprenti',  icon:'🥾', color:'#1596B4'},
+        {min:5, name:'Habitué',   icon:'🎽', color:'#1596B4'},
+        {min:8, name:'Athlète',   icon:'⚡', color:'#5B3DF5'},
+        {min:11,name:'Guerrier',  icon:'🔥', color:'#E8622A'},
+        {min:15,name:'Vétéran',   icon:'🛡️', color:'#E8622A'},
+        {min:20,name:'Élite',     icon:'💎', color:'#5B3DF5'},
+        {min:25,name:'Champion',  icon:'👑', color:'#C7891A'},
+        {min:30,name:'Maître',    icon:'🏆', color:'#C7891A'},
+        {min:40,name:'Légende',   icon:'🌟', color:'#C7891A'},
+      ];
+    },
+    rankData(){
+      const L=this.levelData.level; const ladder=this.rankLadder;
+      let r=ladder[0]; ladder.forEach(x=>{ if(L>=x.min) r=x; });
+      const next=ladder.find(x=> x.min>L)||null;
+      return { ...r, next };
+    },
+    xpToNextRank(){
+      const nx=this.rankData.next; if(!nx) return 0;
+      // XP total requis pour atteindre le niveau nx.min : somme de 100*k pour k=1..(min-1)
+      let req=0; for(let k=1;k<nx.min;k++) req+=100*k;
+      return Math.max(0, req - this.totalXP);
+    },
 
     validWorkout(){
       if(!this.woForm.duration_min) return false;
@@ -886,6 +1164,16 @@ end $$;`
     const saved=JSON.parse(localStorage.getItem('cadence_cfg')||'null');
     if(saved && saved.url && saved.key){ this.cfg=saved; await this.initClient(); }
     else this.stage='config';
+  },
+
+  watch:{
+    'levelData.level'(nl){
+      if(this._lastLevel==null) return;          // pas encore initialisé après le chargement
+      if(nl>this._lastLevel){
+        this.levelUp = { level:nl, icon:this.rankData.icon, rank:this.rankData.name };
+      }
+      this._lastLevel = nl;
+    }
   },
 
   methods:{
@@ -973,6 +1261,7 @@ end $$;`
       }
       this.stage='app';
       this.tab = this.profileReady ? 'jour' : 'profil';
+      this.$nextTick(()=>{ this._lastLevel = this.levelData.level; });
     },
 
     async loadAll(){
@@ -981,7 +1270,7 @@ end $$;`
         this.db.from('profile').select('*').eq('user_id',uid).maybeSingle(),
         this.db.from('weights').select('*').eq('user_id',uid),
         this.db.from('workouts').select('*').eq('user_id',uid),
-        this.db.from('intakes').select('*').eq('user_id',uid).gte('ts', this.since(7)),
+        this.db.from('intakes').select('*').eq('user_id',uid).gte('ts', this.since(120)),
         this.db.from('goals').select('*').eq('user_id',uid),
       ]);
       this.profile=p.data||null;
