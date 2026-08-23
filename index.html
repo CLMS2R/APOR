@@ -49,7 +49,7 @@
   a{color:var(--strength)}
 
   /* ---------- layout ---------- */
-  .app{max-width:1080px;margin:0 auto;padding:0 18px 120px}
+  .app{max-width:1080px;margin:0 auto;padding:0 18px;padding-bottom:calc(94px + env(safe-area-inset-bottom))}
   .topbar{
     position:sticky;top:0;z-index:20;
     display:flex;align-items:center;justify-content:space-between;gap:12px;
@@ -251,6 +251,26 @@
   .levelup .big{font-size:52px;line-height:1;margin-bottom:6px}
   @keyframes pop{from{transform:scale(.8);opacity:0}to{transform:scale(1);opacity:1}}
 
+  /* ---------- bottom navigation ---------- */
+  .bottomnav{
+    position:fixed;left:0;right:0;bottom:0;z-index:45;display:flex;
+    background:rgba(255,255,255,.92);backdrop-filter:blur(12px);
+    border-top:1px solid var(--hairline);
+    padding:7px 4px calc(7px + env(safe-area-inset-bottom));
+  }
+  .navbtn{
+    flex:1 1 0;min-width:0;position:relative;background:none;border:none;
+    display:flex;align-items:center;justify-content:center;padding:9px 0;color:var(--faint);
+    transition:color .15s;
+  }
+  .navbtn svg{width:26px;height:26px;display:block}
+  .navbtn.on{color:var(--strength)}
+  .navbtn.on::before{
+    content:"";position:absolute;top:-7px;width:26px;height:3px;border-radius:0 0 4px 4px;
+    background:var(--strength);
+  }
+  .navbtn:active{transform:scale(.92)}
+
   @media (prefers-reduced-motion: reduce){
     *{transition:none!important;animation:none!important}
   }
@@ -320,11 +340,6 @@
       <div class="who">
         <button @click="signOut">Se déconnecter</button>
       </div>
-    </div>
-
-    <div class="tabs">
-      <button v-for="t in tabsList" :key="t.id" class="tab" :class="{on:tab===t.id}" @click="tab=t.id">
-        <span class="dot"></span>{{ t.label }}</button>
     </div>
 
     <!-- ===== profil manquant ===== -->
@@ -512,6 +527,56 @@
           </div>
         </div>
       </div>
+
+      <div class="grid g-3" style="margin-top:16px">
+        <div class="card">
+          <h3>Objectif de poids</h3>
+          <div class="field"><label>Poids visé (kg)</label>
+            <input type="number" step="0.1" v-model.number="gForm.target" placeholder="ex. 72" /></div>
+          <div class="field"><label>Échéance (optionnel)</label>
+            <input type="date" v-model="gForm.date" /></div>
+          <button class="btn strength full" :disabled="!gForm.target" @click="saveGoal">Enregistrer l'objectif</button>
+
+          <div v-if="goals.length" class="list" style="margin-top:18px">
+            <div class="eyebrow" style="margin-bottom:8px">Objectifs</div>
+            <div v-for="g in goals" :key="g.id" class="item">
+              <div class="ico">🎯</div>
+              <div class="main"><b>{{ g.target_weight_kg }} kg</b>
+                <small>{{ g.target_date? 'pour le '+frDate(g.target_date):'sans échéance' }}</small></div>
+              <button class="x" @click="delGoal(g.id)">×</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3>Recommandations</h3>
+          <div v-if="!activeGoal || !currentWeight" class="empty">
+            Renseignez votre poids actuel et un objectif pour obtenir un plan.</div>
+          <template v-else>
+            <div class="callout" :class="reco.tone" style="margin-bottom:16px">
+              <span>{{ reco.icon }}</span><span v-html="reco.headline"></span>
+            </div>
+            <div class="kv"><span>Poids actuel</span><b class="num">{{ currentWeight }} kg</b></div>
+            <div class="kv"><span>Objectif</span><b class="num">{{ activeGoal.target_weight_kg }} kg</b></div>
+            <div class="kv"><span>Écart</span><b class="num">{{ signed(activeGoal.target_weight_kg-currentWeight) }} kg</b></div>
+            <div class="kv"><span>Calories / jour (aujourd'hui)</span><b class="num">{{ calorieTarget }} kcal</b></div>
+            <div class="kv"><span>Protéines / jour</span><b class="num">{{ proteinTarget }} g</b></div>
+            <div class="kv"><span>Rythme conseillé</span><b class="num">{{ reco.weeklyRate }} kg/sem.</b></div>
+            <div class="kv"><span>Durée estimée</span><b class="num">{{ reco.eta }}</b></div>
+
+            <div class="eyebrow" style="margin:18px 0 8px">Pour viser ce poids en restant musclé</div>
+            <ul class="note" style="margin:0;padding-left:18px;line-height:1.7">
+              <li v-for="tip in reco.tips" :key="tip" v-html="tip"></li>
+            </ul>
+
+            <div class="callout warn" style="margin-top:16px">
+              <span>ℹ️</span><span>Ces repères sont indicatifs et calculés par des formules standard
+                (Mifflin-St Jeor). Ils ne remplacent pas l'avis d'un médecin ou d'un diététicien,
+                surtout en cas de condition de santé particulière.</span>
+            </div>
+          </template>
+        </div>
+      </div>
     </div>
 
     <!-- ============ ENTRAINEMENTS ============ -->
@@ -576,7 +641,7 @@
           <h3>Séances à venir & récentes</h3>
           <div class="list">
             <div v-if="!workouts.length" class="empty">Aucune séance enregistrée.</div>
-            <div v-for="w in workoutsSorted" :key="w.id" class="item">
+            <div v-for="w in workoutsAgenda" :key="w.id" class="item">
               <div class="ico">{{ typeIcon(w.type) }}</div>
               <div class="main">
                 <b>{{ w.type }}</b>
@@ -589,59 +654,6 @@
               <button class="x" @click="delWorkout(w.id)">×</button>
             </div>
           </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- ============ OBJECTIFS ============ -->
-    <div v-show="tab==='objectifs'">
-      <div class="grid g-3">
-        <div class="card">
-          <h3>Fixer un objectif de poids</h3>
-          <div class="field"><label>Poids visé (kg)</label>
-            <input type="number" step="0.1" v-model.number="gForm.target" placeholder="ex. 72" /></div>
-          <div class="field"><label>Échéance (optionnel)</label>
-            <input type="date" v-model="gForm.date" /></div>
-          <button class="btn strength full" :disabled="!gForm.target" @click="saveGoal">Enregistrer l'objectif</button>
-
-          <div v-if="goals.length" class="list" style="margin-top:18px">
-            <div class="eyebrow" style="margin-bottom:8px">Objectifs</div>
-            <div v-for="g in goals" :key="g.id" class="item">
-              <div class="ico">🎯</div>
-              <div class="main"><b>{{ g.target_weight_kg }} kg</b>
-                <small>{{ g.target_date? 'pour le '+frDate(g.target_date):'sans échéance' }}</small></div>
-              <button class="x" @click="delGoal(g.id)">×</button>
-            </div>
-          </div>
-        </div>
-
-        <div class="card">
-          <h3>Recommandations</h3>
-          <div v-if="!activeGoal || !currentWeight" class="empty">
-            Renseignez votre poids actuel et un objectif pour obtenir un plan.</div>
-          <template v-else>
-            <div class="callout" :class="reco.tone" style="margin-bottom:16px">
-              <span>{{ reco.icon }}</span><span v-html="reco.headline"></span>
-            </div>
-            <div class="kv"><span>Poids actuel</span><b class="num">{{ currentWeight }} kg</b></div>
-            <div class="kv"><span>Objectif</span><b class="num">{{ activeGoal.target_weight_kg }} kg</b></div>
-            <div class="kv"><span>Écart</span><b class="num">{{ signed(activeGoal.target_weight_kg-currentWeight) }} kg</b></div>
-            <div class="kv"><span>Calories / jour (aujourd'hui)</span><b class="num">{{ calorieTarget }} kcal</b></div>
-            <div class="kv"><span>Protéines / jour</span><b class="num">{{ proteinTarget }} g</b></div>
-            <div class="kv"><span>Rythme conseillé</span><b class="num">{{ reco.weeklyRate }} kg/sem.</b></div>
-            <div class="kv"><span>Durée estimée</span><b class="num">{{ reco.eta }}</b></div>
-
-            <div class="eyebrow" style="margin:18px 0 8px">Pour viser ce poids en restant musclé</div>
-            <ul class="note" style="margin:0;padding-left:18px;line-height:1.7">
-              <li v-for="tip in reco.tips" :key="tip" v-html="tip"></li>
-            </ul>
-
-            <div class="callout warn" style="margin-top:16px">
-              <span>ℹ️</span><span>Ces repères sont indicatifs et calculés par des formules standard
-                (Mifflin-St Jeor). Ils ne remplacent pas l'avis d'un médecin ou d'un diététicien,
-                surtout en cas de condition de santé particulière.</span>
-            </div>
-          </template>
         </div>
       </div>
     </div>
@@ -763,6 +775,16 @@
       </div>
     </div>
 
+    <nav class="bottomnav">
+      <button v-for="t in tabsList" :key="t.id" class="navbtn" :class="{on:tab===t.id}"
+        :title="t.label" :aria-label="t.label" @click="tab=t.id">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"
+          stroke-linecap="round" stroke-linejoin="round">
+          <path v-for="(d,i) in t.icon" :key="i" :d="d" />
+        </svg>
+      </button>
+    </nav>
+
   </div>
 
   <transition name="fade">
@@ -850,12 +872,11 @@ const __app = createApp({
       muscleGroups:['Pectoraux','Dos','Épaules','Trapèzes','Biceps','Triceps','Avant-bras',
                     'Quadriceps','Ischio-jambiers','Fessiers','Mollets','Abdominaux'],
       tabsList:[
-        {id:'jour',label:'Aujourd\'hui'},
-        {id:'progression',label:'Progression'},
-        {id:'poids',label:'Poids'},
-        {id:'entrainements',label:'Entraînements'},
-        {id:'objectifs',label:'Objectifs'},
-        {id:'profil',label:'Profil'},
+        {id:'jour',label:'Aujourd\'hui',icon:['M3 11.5 12 4l9 7.5','M5.5 10v9.5h13V10','M9.75 19.5v-6h4.5v6']},
+        {id:'progression',label:'Progression',icon:['M7 4h10v4a5 5 0 0 1-10 0z','M7 5H4v2a3 3 0 0 0 3 3','M17 5h3v2a3 3 0 0 0-3 3','M12 13.5V17','M8.5 20.5h7','M10 17.5h4v3h-4z']},
+        {id:'poids',label:'Poids',icon:['M6 4h12a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z','M9 14.5a3 3 0 0 1 6 0','M12 14.5 14 11']},
+        {id:'entrainements',label:'Entraînements',icon:['M4 10v4','M7 8v8','M17 8v8','M20 10v4','M7 12h10']},
+        {id:'profil',label:'Profil',icon:['M12 4.5a3.5 3.5 0 1 1 0 7 3.5 3.5 0 0 1 0-7z','M5 20a7 7 0 0 1 14 0']},
       ],
       sqlSetup:
 `create extension if not exists pgcrypto;
@@ -928,7 +949,15 @@ end $$;`
     todayWater(){ return this.todayIntakes.filter(i=>i.kind==='water').reduce((s,i)=>s+Number(i.amount),0); },
     todayBurn(){ return this.todayWorkouts.reduce((s,w)=>s+this.burnOf(w),0); },
 
-    workoutsSorted(){ return [...this.workouts].sort((a,b)=> b.date>a.date?1:-1 || (b.start_time>a.start_time?1:-1)); },
+    workoutsAgenda(){
+      const today=todayISO();
+      const list=[...this.workouts];
+      const upcoming=list.filter(w=> w.date>=today).sort((a,b)=>
+        a.date===b.date ? (a.start_time||'').localeCompare(b.start_time||'') : a.date.localeCompare(b.date));
+      const past=list.filter(w=> w.date<today).sort((a,b)=>
+        a.date===b.date ? (b.start_time||'').localeCompare(a.start_time||'') : b.date.localeCompare(a.date));
+      return [...upcoming, ...past];
+    },
 
     bmr(){
       if(!this.profileReady || !this.currentWeight) return 0;
