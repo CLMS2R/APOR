@@ -32,13 +32,15 @@
     --body:'Inter',system-ui,sans-serif;
   }
   *{box-sizing:border-box}
-  html,body{margin:0;padding:0}
+  html,body{margin:0;padding:0;overflow-x:clip;max-width:100%}
   body{
     background:var(--canvas);
     color:var(--ink);
     font-family:var(--body);
     -webkit-font-smoothing:antialiased;
     line-height:1.5;
+    overflow-wrap:break-word;
+    word-break:break-word;
   }
   h1,h2,h3,h4{font-family:var(--display);margin:0;font-weight:600;letter-spacing:-.01em}
   .num{font-family:var(--display);font-variant-numeric:tabular-nums;font-feature-settings:"tnum"}
@@ -133,13 +135,13 @@
   .field label{font-size:12.5px;font-weight:600;color:var(--slate)}
   input[type=text],input[type=number],input[type=date],input[type=time],input[type=email],
   input[type=password],select,textarea{
-    width:100%;padding:10px 12px;border:1px solid var(--hairline);border-radius:10px;
-    font-size:14.5px;background:#fff;color:var(--ink);transition:.15s
+    width:100%;max-width:100%;min-width:0;padding:10px 12px;border:1px solid var(--hairline);border-radius:10px;
+    font-size:16px;background:#fff;color:var(--ink);transition:.15s
   }
   input:focus,select:focus,textarea:focus{outline:none;border-color:var(--strength);
     box-shadow:0 0 0 3px var(--strength-bg)}
-  .row{display:flex;gap:12px}
-  .row>*{flex:1}
+  .row{display:flex;gap:12px;flex-wrap:wrap}
+  .row>*{flex:1 1 0;min-width:0}
 
   .btn{border:none;border-radius:10px;padding:11px 16px;font-size:14.5px;font-weight:600;
     background:var(--ink);color:#fff;transition:.15s;display:inline-flex;align-items:center;
@@ -203,6 +205,7 @@
     border-radius:8px;padding:12px;overflow:auto;font-family:ui-monospace,monospace;line-height:1.45}
 
   .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--ink);color:#fff;
+    max-width:90vw;text-align:center;
     padding:11px 18px;border-radius:999px;font-size:14px;z-index:50;box-shadow:var(--shadow)}
   .fade-enter-active,.fade-leave-active{transition:opacity .25s}
   .fade-enter-from,.fade-leave-to{opacity:0}
