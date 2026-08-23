@@ -93,9 +93,12 @@
     background:var(--surface);border:1px solid var(--hairline);border-radius:var(--radius);
     padding:20px;box-shadow:var(--shadow);
   }
-  .card h3{font-size:13px;letter-spacing:.1em;text-transform:uppercase;color:var(--slate);
+  .card h3{font-size:13px;letter-spacing:.1em;text-transform:uppercase;color:var(--tab,var(--slate));
     font-weight:600;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between}
-  .eyebrow{font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--faint);font-weight:600}
+  .eyebrow{font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--tab,var(--faint));font-weight:600}
+  .tabtitle{display:flex;align-items:center;gap:11px;margin:2px 0 16px;
+    font-family:var(--display);font-size:21px;font-weight:600;letter-spacing:-.01em;color:var(--tab,var(--ink))}
+  .tabtitle svg{width:25px;height:25px;flex:none}
 
   /* ---------- signature: gauges ---------- */
   .gauges{display:flex;gap:22px;align-items:stretch}
@@ -331,7 +334,7 @@
   <div v-else-if="stage==='loading'" class="gate"><div class="spinner"></div></div>
 
   <!-- ============ APP ============ -->
-  <div v-else class="app">
+  <div v-else class="app" :style="{'--tab':activeColor}">
     <div class="topbar">
       <div class="brand">
         <div class="mark"></div>
@@ -346,6 +349,15 @@
     <div v-if="!profileReady && tab!=='profil'" class="callout info" style="margin-bottom:16px">
       <span>👤</span><span>Renseignez d'abord votre profil (taille, âge, sexe) pour calculer vos objectifs.
         <a href="#" @click.prevent="tab='profil'">Compléter le profil →</a></span>
+    </div>
+
+    <!-- ===== titre de l'onglet actif (couleur identitaire) ===== -->
+    <div class="tabtitle">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"
+        stroke-linecap="round" stroke-linejoin="round">
+        <path v-for="(d,i) in activeTab.icon" :key="i" :d="d" />
+      </svg>
+      <span>{{ activeTab.label }}</span>
     </div>
 
     <!-- ============ DASHBOARD ============ -->
@@ -937,6 +949,8 @@ end $$;`
   computed:{
     profileReady(){ return this.profile && this.profile.height_cm && this.profile.age; },
     todayLabel(){ return new Date().toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long'}); },
+    activeTab(){ return this.tabsList.find(t=> t.id===this.tab) || this.tabsList[0]; },
+    activeColor(){ return this.activeTab.color; },
 
     weightsDesc(){ return [...this.weights].sort((a,b)=> (b.date>a.date?1:-1) || (b.created_at>a.created_at?1:-1)); },
     currentWeight(){ return this.weightsDesc.length? Number(this.weightsDesc[0].weight_kg) : null; },
