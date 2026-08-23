@@ -210,6 +210,11 @@
     max-width:90vw;text-align:center;
     padding:11px 18px;border-radius:999px;font-size:14px;z-index:50;box-shadow:var(--shadow)}
   .fade-enter-active,.fade-leave-active{transition:opacity .25s}
+  .tabview{will-change:opacity,transform}
+  .tabslide-enter-active{transition:opacity .24s ease, transform .24s cubic-bezier(.2,.8,.2,1)}
+  .tabslide-leave-active{transition:opacity .14s ease, transform .14s ease}
+  .tabslide-enter-from{opacity:0;transform:translateY(12px)}
+  .tabslide-leave-to{opacity:0;transform:translateY(-6px)}
   .fade-enter-from,.fade-leave-to{opacity:0}
 
   .spinner{width:34px;height:34px;border:3px solid var(--hairline);border-top-color:var(--strength);
@@ -360,8 +365,10 @@
       <span>{{ activeTab.label }}</span>
     </div>
 
+    <transition name="tabslide" mode="out-in">
+    <div :key="tab" class="tabview">
     <!-- ============ DASHBOARD ============ -->
-    <div v-show="tab==='jour'">
+    <div v-if="tab==='jour'">
       <div v-if="currentWeight||weights.length||workouts.length||intakes.length" class="card" style="margin-bottom:16px;cursor:pointer" @click="tab='progression'">
         <div class="hero-rank">
           <div class="rank-emblem" :style="{background:rankData.color+'22',color:rankData.color}">{{ rankData.icon }}</div>
@@ -486,7 +493,7 @@
     </div>
 
     <!-- ============ POIDS ============ -->
-    <div v-show="tab==='poids'">
+    <div v-if="tab==='poids'">
       <div class="grid g-3">
         <div class="card">
           <h3>Évolution du poids</h3>
@@ -592,7 +599,7 @@
     </div>
 
     <!-- ============ ENTRAINEMENTS ============ -->
-    <div v-show="tab==='entrainements'">
+    <div v-if="tab==='entrainements'">
       <div class="grid g-3">
         <div class="card">
           <h3>Programmer une séance</h3>
@@ -671,7 +678,7 @@
     </div>
 
     <!-- ============ PROGRESSION ============ -->
-    <div v-show="tab==='progression'">
+    <div v-if="tab==='progression'">
       <div class="grid g-3">
         <div class="card">
           <h3>Votre rang</h3>
@@ -749,7 +756,7 @@
     </div>
 
     <!-- ============ PROFIL ============ -->
-    <div v-show="tab==='profil'">
+    <div v-if="tab==='profil'">
       <div class="grid g-2">
         <div class="card">
           <h3>Profil</h3>
@@ -786,6 +793,8 @@
         </div>
       </div>
     </div>
+    </div>
+    </transition>
 
     <nav class="bottomnav">
       <button v-for="t in tabsList" :key="t.id" class="navbtn" :class="{on:tab===t.id}"
