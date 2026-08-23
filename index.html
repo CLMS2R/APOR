@@ -346,7 +346,15 @@
             <div class="xpbar"><i :style="{width:levelData.pct+'%'}"></i></div>
             <div class="note" style="font-size:12px;display:flex;justify-content:space-between;gap:8px">
               <span>{{ levelData.into }} / {{ levelData.need }} XP</span>
-              <span>🔥 {{ streak }} j · +{{ todayXP }} XP aujourd'hui</span>
+              <span>🔥 {{ streak }} j</span>
+            </div>
+            <div style="display:flex;gap:6px;margin-top:9px;flex-wrap:wrap">
+              <span v-if="todayQualifies" class="badge" style="background:#E4F5EC;color:#146b43">🎉 Journée validée · +100 XP</span>
+              <template v-else>
+                <span class="badge" :style="chkStyle(todayChecks.workout)">{{ todayChecks.workout?'✓':'○' }} Séance</span>
+                <span class="badge" :style="chkStyle(todayChecks.calories)">{{ todayChecks.calories?'✓':'○' }} Calories</span>
+                <span class="badge" :style="chkStyle(todayChecks.water)">{{ todayChecks.water?'✓':'○' }} Eau</span>
+              </template>
             </div>
           </div>
         </div>
@@ -658,8 +666,8 @@
           <div class="gstats" style="margin-top:16px">
             <div class="gstat"><div class="v num">🔥 {{ streak }}</div><div class="k">Série en cours</div></div>
             <div class="gstat"><div class="v num">{{ maxStreak }}</div><div class="k">Record</div></div>
+            <div class="gstat"><div class="v num">{{ qualifyingCount }}</div><div class="k">Journées validées</div></div>
             <div class="gstat"><div class="v num">{{ totalXP }}</div><div class="k">XP total</div></div>
-            <div class="gstat"><div class="v num">{{ activeDaysCount }}</div><div class="k">Jours actifs</div></div>
           </div>
 
           <div v-if="rankData.next" class="callout info" style="margin-top:16px">
@@ -671,11 +679,24 @@
             <span>🌟</span><span>Rang maximal atteint : vous êtes une <b>Légende</b>. Continuez à cumuler des niveaux !</span>
           </div>
 
-          <div class="eyebrow" style="margin:18px 0 6px">Comment gagner de l'XP</div>
+          <div class="eyebrow" style="margin:18px 0 8px">Votre journée</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:6px">
+            <span class="badge" :style="chkStyle(todayChecks.workout)">{{ todayChecks.workout?'✓':'○' }} Séance réalisée</span>
+            <span class="badge" :style="chkStyle(todayChecks.calories)">{{ todayChecks.calories?'✓':'○' }} Calories atteintes</span>
+            <span class="badge" :style="chkStyle(todayChecks.water)">{{ todayChecks.water?'✓':'○' }} Eau atteinte</span>
+          </div>
+          <div class="callout" :class="todayQualifies?'good':'info'">
+            <span>{{ todayQualifies?'🎉':'🎯' }}</span>
+            <span v-if="todayQualifies">Journée validée : <b>+100 XP</b> acquis aujourd'hui.</span>
+            <span v-else>Validez les trois conditions ci-dessus pour gagner <b>+100 XP</b> aujourd'hui.</span>
+          </div>
+
+          <div class="eyebrow" style="margin:18px 0 6px">Comment monter en niveau</div>
           <div class="note" style="line-height:1.7">
-            Boire de l'eau <b>+10</b> · atteindre son eau du jour est déjà tracké dans les jauges ·
-            enregistrer un repas <b>+10</b> · réaliser une séance <b>+25</b> · se peser <b>+15</b> ·
-            journée complète (eau + repas + séance) <b>+20</b>. Chaque succès débloqué rapporte un bonus.
+            Le niveau ne progresse que de deux façons : <b>valider une journée</b> — réaliser au moins une
+            séance <b>et</b> atteindre vos apports du jour (calories <b>et</b> eau), soit <b>+100 XP</b> —
+            ou <b>débloquer un succès</b> (bonus variable). Enregistrer vos données sans réunir ces conditions
+            alimente vos statistiques et vos séries, mais pas votre niveau.
           </div>
         </div>
 
@@ -1006,31 +1027,25 @@ end $$;`
       });
       return best;
     },
-    dayFlags(){
-      const by={};
-      const f=(d)=> (by[d]=by[d]||{});
-      this.intakes.forEach(i=>{ const d=(i.ts||'').slice(0,10); if(!d)return; f(d)[i.kind==='water'?'water':'food']=true; });
-      this.workouts.forEach(w=>{ if(w.date) f(w.date).workout=true; });
-      this.weights.forEach(w=>{ if(w.date) f(w.date).weight=true; });
-      return by;
+    // Une journée est "validée" (=+100 XP) si : au moins une séance réalisée
+    // ET les apports du jour atteints (calories >= objectif ET eau >= objectif).
+    qualifyingDates(){
+      const wdays=[...new Set(this.workouts.map(w=>w.date))];
+      return wdays.filter(d=> this.dayQualifies(d));
     },
-    dailyXP(){
-      let xp=0;
-      Object.values(this.dayFlags).forEach(fl=>{
-        if(fl.water) xp+=10;
-        if(fl.food) xp+=10;
-        if(fl.workout) xp+=25;
-        if(fl.weight) xp+=15;
-        if(fl.water&&fl.food&&fl.workout) xp+=20;
-      });
-      return xp;
+    qualifyingCount(){ return this.qualifyingDates.length; },
+    qualifyingXP(){ return this.qualifyingCount*100; },
+    todayChecks(){
+      const ds=todayISO();
+      const ct=this.calorieTargetForDay(ds), wt=this.waterTargetForDay(ds);
+      return {
+        workout: this.workoutsOnDay(ds).length>0,
+        calories: ct!=null && this.caloriesOnDay(ds)>=ct,
+        water: wt!=null && this.waterOnDay(ds)>=wt,
+      };
     },
-    todayXP(){
-      const fl=this.dayFlags[todayISO()]||{}; let xp=0;
-      if(fl.water) xp+=10; if(fl.food) xp+=10; if(fl.workout) xp+=25; if(fl.weight) xp+=15;
-      if(fl.water&&fl.food&&fl.workout) xp+=20;
-      return xp;
-    },
+    todayQualifies(){ const c=this.todayChecks; return c.workout && c.calories && c.water; },
+    todayXP(){ return this.todayQualifies? 100 : 0; },
     hydrationDays(){
       const by={};
       this.intakes.filter(i=>i.kind==='water').forEach(i=>{ const d=(i.ts||'').slice(0,10); by[d]=(by[d]||0)+Number(i.amount); });
@@ -1064,7 +1079,7 @@ end $$;`
     },
     unlockedCount(){ return this.achievements.filter(a=>a.done).length; },
     achievementXP(){ return this.achievements.filter(a=>a.done).reduce((s,a)=>s+a.xp,0); },
-    totalXP(){ return this.dailyXP + this.achievementXP; },
+    totalXP(){ return this.qualifyingXP + this.achievementXP; },
     levelData(){
       let into=this.totalXP, level=1, need=100;
       while(into>=need){ into-=need; level++; need=level*100; }
@@ -1362,16 +1377,62 @@ end $$;`
       };
       return (table[t]||table.Autre)[inten] || 4;
     },
-    burnOf(w){
-      const kg=this.currentWeight||75;
+    burnOfW(w, kg){
       const h=(w.duration_min||0)/60;
-      return this.metOf(w)*kg*h;
+      return this.metOf(w)*(kg||this.currentWeight||75)*h;
     },
+    burnOf(w){ return this.burnOfW(w, this.currentWeight||75); },
     waterAddOf(w){
       const h=(w.duration_min||0)/60;
       const factor={Musculation:500,Cardio:700,HIIT:700,Endurance:700,Mobilité:250,Autre:450}[w.type]||450;
       return factor*h;
     },
+
+    // ----- objectifs & apports reconstitués par jour (pour la validation d'XP) -----
+    weightOnDate(ds){
+      const before=this.weights.filter(w=> w.date<=ds).sort((a,b)=> a.date>b.date?-1:1);
+      if(before.length) return Number(before[0].weight_kg);
+      const any=[...this.weights].sort((a,b)=> a.date>b.date?1:-1);
+      return any.length? Number(any[0].weight_kg) : null;
+    },
+    bmrFor(kg){
+      if(!this.profileReady || !kg) return 0;
+      const h=this.profile.height_cm, a=this.profile.age;
+      const base=10*kg+6.25*h-5*a;
+      return this.profile.sex==='femme'? base-161 : base+5;
+    },
+    workoutsOnDay(ds){ return this.workouts.filter(w=> w.date===ds); },
+    calorieTargetForDay(ds){
+      const kg=this.weightOnDate(ds);
+      if(!kg || !this.profileReady) return null;
+      const bmr=this.bmrFor(kg);
+      const burn=this.workoutsOnDay(ds).reduce((s,w)=> s+this.burnOfW(w,kg), 0);
+      const maintenance=bmr*this.baseFactor+burn;
+      const raw=maintenance+this.goalAdjust.kcal;
+      const floor=Math.max(bmr, this.profile.sex==='femme'?1200:1500);
+      return Math.round(Math.max(raw,floor)/10)*10;
+    },
+    waterTargetForDay(ds){
+      const kg=this.weightOnDate(ds);
+      if(!kg) return null;
+      const add=this.workoutsOnDay(ds).reduce((s,w)=> s+this.waterAddOf(w), 0);
+      return Math.round((kg*35+add)/50)*50;
+    },
+    caloriesOnDay(ds){
+      return this.intakes.filter(i=> i.kind==='calorie' && (i.ts||'').slice(0,10)===ds)
+        .reduce((s,i)=> s+Number(i.amount), 0);
+    },
+    waterOnDay(ds){
+      return this.intakes.filter(i=> i.kind==='water' && (i.ts||'').slice(0,10)===ds)
+        .reduce((s,i)=> s+Number(i.amount), 0);
+    },
+    dayQualifies(ds){
+      if(!this.workoutsOnDay(ds).length) return false;
+      const ct=this.calorieTargetForDay(ds), wt=this.waterTargetForDay(ds);
+      if(ct==null || wt==null) return false;
+      return this.caloriesOnDay(ds)>=ct && this.waterOnDay(ds)>=wt;
+    },
+    chkStyle(ok){ return ok? 'background:#E4F5EC;color:#146b43' : ''; },
   }
 });
 try {
