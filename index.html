@@ -260,14 +260,14 @@
   }
   .navbtn{
     flex:1 1 0;min-width:0;position:relative;background:none;border:none;
-    display:flex;align-items:center;justify-content:center;padding:9px 0;color:var(--faint);
-    transition:color .15s;
+    display:flex;align-items:center;justify-content:center;padding:9px 0;
+    opacity:.5;transition:opacity .15s,background .15s;border-radius:12px;margin:0 2px;
   }
   .navbtn svg{width:26px;height:26px;display:block}
-  .navbtn.on{color:var(--strength)}
+  .navbtn.on{opacity:1;background:color-mix(in srgb, currentColor 12%, transparent)}
   .navbtn.on::before{
     content:"";position:absolute;top:-7px;width:26px;height:3px;border-radius:0 0 4px 4px;
-    background:var(--strength);
+    background:currentColor;
   }
   .navbtn:active{transform:scale(.92)}
 
@@ -777,7 +777,7 @@
 
     <nav class="bottomnav">
       <button v-for="t in tabsList" :key="t.id" class="navbtn" :class="{on:tab===t.id}"
-        :title="t.label" :aria-label="t.label" @click="tab=t.id">
+        :title="t.label" :aria-label="t.label" :style="{color:t.color}" @click="tab=t.id">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"
           stroke-linecap="round" stroke-linejoin="round">
           <path v-for="(d,i) in t.icon" :key="i" :d="d" />
@@ -872,11 +872,11 @@ const __app = createApp({
       muscleGroups:['Pectoraux','Dos','Épaules','Trapèzes','Biceps','Triceps','Avant-bras',
                     'Quadriceps','Ischio-jambiers','Fessiers','Mollets','Abdominaux'],
       tabsList:[
-        {id:'jour',label:'Aujourd\'hui',icon:['M3 11.5 12 4l9 7.5','M5.5 10v9.5h13V10','M9.75 19.5v-6h4.5v6']},
-        {id:'progression',label:'Progression',icon:['M7 4h10v4a5 5 0 0 1-10 0z','M7 5H4v2a3 3 0 0 0 3 3','M17 5h3v2a3 3 0 0 0-3 3','M12 13.5V17','M8.5 20.5h7','M10 17.5h4v3h-4z']},
-        {id:'poids',label:'Poids',icon:['M6 4h12a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z','M9 14.5a3 3 0 0 1 6 0','M12 14.5 14 11']},
-        {id:'entrainements',label:'Entraînements',icon:['M4 10v4','M7 8v8','M17 8v8','M20 10v4','M7 12h10']},
-        {id:'profil',label:'Profil',icon:['M12 4.5a3.5 3.5 0 1 1 0 7 3.5 3.5 0 0 1 0-7z','M5 20a7 7 0 0 1 14 0']},
+        {id:'jour',label:'Aujourd\'hui',color:'#E8622A',icon:['M3 11.5 12 4l9 7.5','M5.5 10v9.5h13V10','M9.75 19.5v-6h4.5v6']},
+        {id:'progression',label:'Progression',color:'#C7891A',icon:['M7 4h10v4a5 5 0 0 1-10 0z','M7 5H4v2a3 3 0 0 0 3 3','M17 5h3v2a3 3 0 0 0-3 3','M12 13.5V17','M8.5 20.5h7','M10 17.5h4v3h-4z']},
+        {id:'poids',label:'Poids',color:'#1F9E63',icon:['M6 4h12a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z','M9 14.5a3 3 0 0 1 6 0','M12 14.5 14 11']},
+        {id:'entrainements',label:'Entraînements',color:'#5B3DF5',icon:['M4 10v4','M7 8v8','M17 8v8','M20 10v4','M7 12h10']},
+        {id:'profil',label:'Profil',color:'#1596B4',icon:['M12 4.5a3.5 3.5 0 1 1 0 7 3.5 3.5 0 0 1 0-7z','M5 20a7 7 0 0 1 14 0']},
       ],
       sqlSetup:
 `create extension if not exists pgcrypto;
