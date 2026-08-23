@@ -49,7 +49,8 @@
   a{color:var(--strength)}
 
   /* ---------- layout ---------- */
-  .app{max-width:1080px;margin:0 auto;padding:0 18px;padding-bottom:calc(94px + env(safe-area-inset-bottom))}
+  .app{max-width:1080px;margin:0 auto;padding:0 18px;padding-top:calc(14px + env(safe-area-inset-top));padding-bottom:calc(94px + env(safe-area-inset-bottom))}
+  .daydate{font-size:13px;color:var(--slate);text-transform:capitalize;margin:-4px 0 14px;font-weight:500}
   .topbar{
     position:sticky;top:0;z-index:20;
     display:flex;align-items:center;justify-content:space-between;gap:12px;
@@ -340,15 +341,6 @@
 
   <!-- ============ APP ============ -->
   <div v-else class="app" :style="{'--tab':activeColor}">
-    <div class="topbar">
-      <div class="brand">
-        <div class="mark"></div>
-        <div><b>Cadence</b><span>{{ todayLabel }}</span></div>
-      </div>
-      <div class="who">
-        <button @click="signOut">Se déconnecter</button>
-      </div>
-    </div>
 
     <!-- ===== profil manquant ===== -->
     <div v-if="!profileReady && tab!=='profil'" class="callout info" style="margin-bottom:16px">
@@ -369,6 +361,7 @@
     <div :key="tab" class="tabview">
     <!-- ============ DASHBOARD ============ -->
     <div v-if="tab==='jour'">
+      <div class="daydate">{{ todayLabel }}</div>
       <div v-if="currentWeight||weights.length||workouts.length||intakes.length" class="card" style="margin-bottom:16px;cursor:pointer" @click="tab='progression'">
         <div class="hero-rank">
           <div class="rank-emblem" :style="{background:rankData.color+'22',color:rankData.color}">{{ rankData.icon }}</div>
@@ -792,6 +785,7 @@
           </template>
         </div>
       </div>
+      <button class="btn ghost full" style="margin-top:16px;color:var(--danger)" @click="signOut">Se déconnecter</button>
     </div>
     </div>
     </transition>
